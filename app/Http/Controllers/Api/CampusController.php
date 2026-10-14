@@ -95,13 +95,28 @@ public function show($id)
         'data' => $campus,
     ]);
 }
+
 public function update(Request $request, $id)
 {
     $campus = Campus::findOrFail($id);
 
     $validated = $request->validate([
         'institution_id' => 'required|exists:institutions,id',
-        'name' => 'required|string|max:255',
+
+        'name' => [
+            'required',
+            'string',
+            'max:255',
+            Rule::unique('campuses')
+                ->where(function ($query) use ($request) {
+                    return $query->where(
+                        'institution_id',
+                        $request->institution_id
+                    );
+                })
+                ->ignore($campus->id),
+        ],
+
         'code' => 'required|string|max:50',
         'address' => 'nullable|string|max:255',
         'is_active' => 'boolean',
@@ -114,6 +129,7 @@ public function update(Request $request, $id)
         'data' => $campus,
     ]);
 }
+
 public function destroy($id)
 {
     $campus = Campus::findOrFail($id);
