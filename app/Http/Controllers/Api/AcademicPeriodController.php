@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicPeriod;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-class AcademicPeriodController extends Controller
 
+
+
+class AcademicPeriodController extends Controller
 {
     public function index()
     {
@@ -19,176 +21,190 @@ class AcademicPeriodController extends Controller
         ]);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate(
-        [
-            'institution_id' => 'required|exists:institutions,id',
+    public function store(Request $request)
+    {
+        $validated = $request->validate(
+            [
+                'institution_id' => 'required|exists:institutions,id',
 
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('academic_periods')
-                    ->where(function ($query) use ($request) {
-                        return $query->where(
-                            'institution_id',
-                            $request->institution_id
-                        );
-                    }),
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_periods')
+                        ->where(function ($query) use ($request) {
+                            return $query->where(
+                                'institution_id',
+                                $request->institution_id
+                            );
+                        }),
+                ],
+
+                'code' => 'nullable|string|max:50',
+
+                'start_date' => 'required|date',
+
+                'end_date' => [
+                    'required',
+                    'date',
+                    'after_or_equal:start_date',
+                ],
+
+                'is_active' => 'boolean',
             ],
+            [
+                'institution_id.required' =>
+                    'La institución es obligatoria.',
 
-            'start_date' => 'required|date',
+                'institution_id.exists' =>
+                    'La institución seleccionada no existe.',
 
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
+                'name.required' =>
+                    'El nombre del período académico es obligatorio.',
+
+                'name.max' =>
+                    'El nombre del período académico no puede superar los 255 caracteres.',
+
+                'name.unique' =>
+                    'El nombre del período académico ya está registrado en esta institución.',
+
+                'code.string' =>
+                    'El código debe ser un texto válido.',
+
+                'code.max' =>
+                    'El código no puede superar los 50 caracteres.',
+
+                'start_date.required' =>
+                    'La fecha de inicio es obligatoria.',
+
+                'start_date.date' =>
+                    'La fecha de inicio debe ser una fecha válida.',
+
+                'end_date.required' =>
+                    'La fecha de fin es obligatoria.',
+
+                'end_date.date' =>
+                    'La fecha de fin debe ser una fecha válida.',
+
+                'end_date.after_or_equal' =>
+                    'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
+
+        $period = AcademicPeriod::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => $period,
+        ], 201);
+    }
+
+    public function show($id)
+    {
+        $period = AcademicPeriod::with('institution')->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $period,
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $period = AcademicPeriod::findOrFail($id);
+
+        $validated = $request->validate(
+            [
+                'institution_id' => 'required|exists:institutions,id',
+
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_periods')
+                        ->where(function ($query) use ($request) {
+                            return $query->where(
+                                'institution_id',
+                                $request->institution_id
+                            );
+                        })
+                        ->ignore($period->id),
+                ],
+
+                'code' => 'nullable|string|max:50',
+
+                'start_date' => 'required|date',
+
+                'end_date' => [
+                    'required',
+                    'date',
+                    'after_or_equal:start_date',
+                ],
+
+                'is_active' => 'boolean',
             ],
+            [
+                'institution_id.required' =>
+                    'La institución es obligatoria.',
 
-            'is_active' => 'boolean',
-        ],
-        [
-            'institution_id.required' =>
-                'La institución es obligatoria.',
+                'institution_id.exists' =>
+                    'La institución seleccionada no existe.',
 
-            'institution_id.exists' =>
-                'La institución seleccionada no existe.',
+                'name.required' =>
+                    'El nombre del período académico es obligatorio.',
 
-            'name.required' =>
-                'El nombre del período académico es obligatorio.',
+                'name.max' =>
+                    'El nombre del período académico no puede superar los 255 caracteres.',
 
-            'name.max' =>
-                'El nombre del período académico no puede superar los 255 caracteres.',
+                'name.unique' =>
+                    'El nombre del período académico ya está registrado en esta institución.',
 
-            'name.unique' =>
-                'El nombre del período académico ya está registrado en esta institución.',
+                'code.string' =>
+                    'El código debe ser un texto válido.',
 
-            'start_date.required' =>
-                'La fecha de inicio es obligatoria.',
+                'code.max' =>
+                    'El código no puede superar los 50 caracteres.',
 
-            'start_date.date' =>
-                'La fecha de inicio debe ser una fecha válida.',
+                'start_date.required' =>
+                    'La fecha de inicio es obligatoria.',
 
-            'end_date.required' =>
-                'La fecha de fin es obligatoria.',
+                'start_date.date' =>
+                    'La fecha de inicio debe ser una fecha válida.',
 
-            'end_date.date' =>
-                'La fecha de fin debe ser una fecha válida.',
+                'end_date.required' =>
+                    'La fecha de fin es obligatoria.',
 
-            'end_date.after_or_equal' =>
-                'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+                'end_date.date' =>
+                    'La fecha de fin debe ser una fecha válida.',
 
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
+                'end_date.after_or_equal' =>
+                    'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
 
-    $period = AcademicPeriod::create($validated);
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
 
-    return response()->json([
-        'success' => true,
-        'data' => $period,
-    ], 201);
-}
+        $period->update($validated);
 
+        return response()->json([
+            'success' => true,
+            'data' => $period,
+        ]);
+    }
 
-public function show($id)
-{
-    $period = AcademicPeriod::with('institution')->findOrFail($id);
+    public function destroy($id)
+    {
+        $period = AcademicPeriod::findOrFail($id);
 
-    return response()->json([
-        'success' => true,
-        'data' => $period,
-    ]);
-}
+        $period->delete();
 
-public function update(Request $request, $id)
-{
-    $period = AcademicPeriod::findOrFail($id);
-
-    $validated = $request->validate(
-        [
-            'institution_id' => 'required|exists:institutions,id',
-
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('academic_periods')
-                    ->where(function ($query) use ($request) {
-                        return $query->where(
-                            'institution_id',
-                            $request->institution_id
-                        );
-                    })
-                    ->ignore($period->id),
-            ],
-
-            'start_date' => 'required|date',
-
-            'end_date' => [
-                'required',
-                'date',
-                'after_or_equal:start_date',
-            ],
-
-            'is_active' => 'boolean',
-        ],
-        [
-            'institution_id.required' =>
-                'La institución es obligatoria.',
-
-            'institution_id.exists' =>
-                'La institución seleccionada no existe.',
-
-            'name.required' =>
-                'El nombre del período académico es obligatorio.',
-
-            'name.max' =>
-                'El nombre del período académico no puede superar los 255 caracteres.',
-
-            'name.unique' =>
-                'El nombre del período académico ya está registrado en esta institución.',
-
-            'start_date.required' =>
-                'La fecha de inicio es obligatoria.',
-
-            'start_date.date' =>
-                'La fecha de inicio debe ser una fecha válida.',
-
-            'end_date.required' =>
-                'La fecha de fin es obligatoria.',
-
-            'end_date.date' =>
-                'La fecha de fin debe ser una fecha válida.',
-
-            'end_date.after_or_equal' =>
-                'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
-
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
-
-    $period->update($validated);
-
-    return response()->json([
-        'success' => true,
-        'data' => $period,
-    ]);
-}
-
-
-public function destroy($id)
-{
-    $period = AcademicPeriod::findOrFail($id);
-
-    $period->delete();
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Período académico eliminado correctamente',
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'message' => 'Período académico eliminado correctamente',
+        ]);
+    }
 }
