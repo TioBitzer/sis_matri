@@ -7,6 +7,9 @@ use App\Models\AcademicUnit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+
+
+
 class AcademicUnitController extends Controller
 {
     public function index()
@@ -19,156 +22,202 @@ class AcademicUnitController extends Controller
         ]);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate(
-        [
-            'institution_id' => 'required|exists:institutions,id',
+    public function store(Request $request)
+    {
+        $validated = $request->validate(
+            [
+                'institution_id' => 'required|exists:institutions,id',
 
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('academic_units')
-                    ->where(function ($query) use ($request) {
-                        return $query->where(
-                            'institution_id',
-                            $request->institution_id
-                        );
-                    }),
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_units')
+                        ->where(function ($query) use ($request) {
+                            return $query->where(
+                                'institution_id',
+                                $request->institution_id
+                            );
+                        }),
+                ],
+
+                'code' => 'nullable|string|max:50',
+
+                'description' => 'nullable|string',
+
+                'unit_type' => 'nullable|string|max:255',
+
+                'credits' => 'nullable|integer|min:0',
+
+                'hours' => 'nullable|integer|min:0',
+
+                'is_active' => 'boolean',
             ],
+            [
+                'institution_id.required' =>
+                    'La institución es obligatoria.',
 
-            'code' => 'nullable|string|max:50',
+                'institution_id.exists' =>
+                    'La institución seleccionada no existe.',
 
-            'description' => 'nullable|string',
+                'name.required' =>
+                    'El nombre de la unidad académica es obligatorio.',
 
-            'is_active' => 'boolean',
-        ],
-        [
-            'institution_id.required' =>
-                'La institución es obligatoria.',
+                'name.max' =>
+                    'El nombre de la unidad académica no puede superar los 255 caracteres.',
 
-            'institution_id.exists' =>
-                'La institución seleccionada no existe.',
+                'name.unique' =>
+                    'El nombre de la unidad académica ya está registrado en esta institución.',
 
-            'name.required' =>
-                'El nombre de la unidad académica es obligatorio.',
+                'code.string' =>
+                    'El código debe ser texto.',
 
-            'name.max' =>
-                'El nombre de la unidad académica no puede superar los 255 caracteres.',
+                'code.max' =>
+                    'El código no puede superar los 50 caracteres.',
 
-            'name.unique' =>
-                'El nombre de la unidad académica ya está registrado en esta institución.',
+                'description.string' =>
+                    'La descripción debe ser texto.',
 
-            'code.string' =>
-                'El código debe ser texto.',
+                'unit_type.string' =>
+                    'El tipo de unidad académica debe ser texto.',
 
-            'code.max' =>
-                'El código no puede superar los 50 caracteres.',
+                'unit_type.max' =>
+                    'El tipo de unidad académica no puede superar los 255 caracteres.',
 
-            'description.string' =>
-                'La descripción debe ser texto.',
+                'credits.integer' =>
+                    'Los créditos deben ser un número entero.',
 
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
+                'credits.min' =>
+                    'Los créditos no pueden ser negativos.',
 
-    $unit = AcademicUnit::create($validated);
+                'hours.integer' =>
+                    'Las horas deben ser un número entero.',
 
-    return response()->json([
-        'success' => true,
-        'data' => $unit,
-    ], 201);
-}
+                'hours.min' =>
+                    'Las horas no pueden ser negativas.',
 
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
 
-public function show($id)
-{
-    $unit = AcademicUnit::with('institution')->findOrFail($id);
+        $unit = AcademicUnit::create($validated);
 
-    return response()->json([
-        'success' => true,
-        'data' => $unit,
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'data' => $unit,
+        ], 201);
+    }
 
-public function update(Request $request, $id)
-{
-    $unit = AcademicUnit::findOrFail($id);
+    public function show($id)
+    {
+        $unit = AcademicUnit::with('institution')->findOrFail($id);
 
-    $validated = $request->validate(
-        [
-            'institution_id' => 'required|exists:institutions,id',
+        return response()->json([
+            'success' => true,
+            'data' => $unit,
+        ]);
+    }
 
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('academic_units')
-                    ->where(function ($query) use ($request) {
-                        return $query->where(
-                            'institution_id',
-                            $request->institution_id
-                        );
-                    })
-                    ->ignore($unit->id),
+    public function update(Request $request, $id)
+    {
+        $unit = AcademicUnit::findOrFail($id);
+
+        $validated = $request->validate(
+            [
+                'institution_id' => 'required|exists:institutions,id',
+
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_units')
+                        ->where(function ($query) use ($request) {
+                            return $query->where(
+                                'institution_id',
+                                $request->institution_id
+                            );
+                        })
+                        ->ignore($unit->id),
+                ],
+
+                'code' => 'nullable|string|max:50',
+
+                'description' => 'nullable|string',
+
+                'unit_type' => 'nullable|string|max:255',
+
+                'credits' => 'nullable|integer|min:0',
+
+                'hours' => 'nullable|integer|min:0',
+
+                'is_active' => 'boolean',
             ],
+            [
+                'institution_id.required' =>
+                    'La institución es obligatoria.',
 
-            'code' => 'nullable|string|max:50',
+                'institution_id.exists' =>
+                    'La institución seleccionada no existe.',
 
-            'description' => 'nullable|string',
+                'name.required' =>
+                    'El nombre de la unidad académica es obligatorio.',
 
-            'is_active' => 'boolean',
-        ],
-        [
-            'institution_id.required' =>
-                'La institución es obligatoria.',
+                'name.max' =>
+                    'El nombre de la unidad académica no puede superar los 255 caracteres.',
 
-            'institution_id.exists' =>
-                'La institución seleccionada no existe.',
+                'name.unique' =>
+                    'El nombre de la unidad académica ya está registrado en esta institución.',
 
-            'name.required' =>
-                'El nombre de la unidad académica es obligatorio.',
+                'code.string' =>
+                    'El código debe ser texto.',
 
-            'name.max' =>
-                'El nombre de la unidad académica no puede superar los 255 caracteres.',
+                'code.max' =>
+                    'El código no puede superar los 50 caracteres.',
 
-            'name.unique' =>
-                'El nombre de la unidad académica ya está registrado en esta institución.',
+                'description.string' =>
+                    'La descripción debe ser texto.',
 
-            'code.string' =>
-                'El código debe ser texto.',
+                'unit_type.string' =>
+                    'El tipo de unidad académica debe ser texto.',
 
-            'code.max' =>
-                'El código no puede superar los 50 caracteres.',
+                'unit_type.max' =>
+                    'El tipo de unidad académica no puede superar los 255 caracteres.',
 
-            'description.string' =>
-                'La descripción debe ser texto.',
+                'credits.integer' =>
+                    'Los créditos deben ser un número entero.',
 
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
+                'credits.min' =>
+                    'Los créditos no pueden ser negativos.',
 
-    $unit->update($validated);
+                'hours.integer' =>
+                    'Las horas deben ser un número entero.',
 
-    return response()->json([
-        'success' => true,
-        'data' => $unit,
-    ]);
-}
+                'hours.min' =>
+                    'Las horas no pueden ser negativas.',
 
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
 
-public function destroy($id)
-{
-    $unit = AcademicUnit::findOrFail($id);
+        $unit->update($validated);
 
-    $unit->delete();
+        return response()->json([
+            'success' => true,
+            'data' => $unit,
+        ]);
+    }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Unidad académica eliminada correctamente',
-    ]);
-}
+    public function destroy($id)
+    {
+        $unit = AcademicUnit::findOrFail($id);
+
+        $unit->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Unidad académica eliminada correctamente',
+        ]);
+    }
 }
