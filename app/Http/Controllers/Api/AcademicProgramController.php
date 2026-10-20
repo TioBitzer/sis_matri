@@ -161,4 +161,27 @@ public function update(Request $request, $id)
         'data' => $program,
     ]);
 }
+
+public function destroy($id)
+{
+    $program = AcademicProgram::findOrFail($id);
+
+    if (
+        $program->academicPlans()->exists() ||
+        $program->academicRecords()->exists()
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No se puede eliminar el programa académico porque tiene planes de estudio o historiales académicos asociados.',
+        ], 409);
+    }
+
+    $program->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Programa académico eliminado correctamente.',
+    ], 200);
+}
+
 }
