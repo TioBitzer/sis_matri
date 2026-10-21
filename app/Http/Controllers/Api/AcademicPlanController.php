@@ -5,6 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicPlan;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+
+
+
 
 class AcademicPlanController extends Controller
 {
@@ -18,138 +23,187 @@ class AcademicPlanController extends Controller
         ]);
     }
 
-public function store(Request $request)
-{
-    $validated = $request->validate(
-        [
-            'academic_program_id' => 'required|exists:academic_programs,id',
-            'name' => 'required|string|max:255',
-            'version' => 'required|string|max:50',
-            'start_date' => 'nullable|date',
-            'end_date' => 'nullable|date|after_or_equal:start_date',
-            'is_active' => 'boolean',
-        ],
-        [
-            'academic_program_id.required' =>
-                'El programa académico es obligatorio.',
+    public function store(Request $request)
+    {
+        $validated = $request->validate(
+            [
+                'academic_program_id' => [
+                    'required',
+                    'exists:academic_programs,id',
+                ],
 
-            'academic_program_id.exists' =>
-                'El programa académico seleccionado no existe.',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_plans', 'name')
+                        ->where(
+                            'academic_program_id',
+                            $request->academic_program_id
+                        ),
+                ],
 
-            'name.required' =>
-                'El nombre del plan académico es obligatorio.',
+                'version' => 'required|string|max:50',
 
-            'name.max' =>
-                'El nombre del plan académico no puede superar los 255 caracteres.',
+                'start_date' => 'nullable|date',
 
-            'version.required' =>
-                'La versión del plan académico es obligatoria.',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
 
-            'version.max' =>
-                'La versión no puede superar los 50 caracteres.',
+                'is_active' => 'boolean',
+            ],
+            [
+                'academic_program_id.required' =>
+                    'El programa académico es obligatorio.',
 
-            'start_date.date' =>
-                'La fecha de inicio debe ser una fecha válida.',
+                'academic_program_id.exists' =>
+                    'El programa académico seleccionado no existe.',
 
-            'end_date.date' =>
-                'La fecha de fin debe ser una fecha válida.',
+                'name.required' =>
+                    'El nombre del plan académico es obligatorio.',
 
-            'end_date.after_or_equal' =>
-                'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+                'name.unique' =>
+                    'Ya existe un plan académico con ese nombre para este programa.',
 
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
+                'name.max' =>
+                    'El nombre del plan académico no puede superar los 255 caracteres.',
 
-    $plan = AcademicPlan::create($validated);
+                'version.required' =>
+                    'La versión del plan académico es obligatoria.',
 
-    return response()->json([
-        'success' => true,
-        'data' => $plan,
-    ], 201);
-}
+                'version.max' =>
+                    'La versión no puede superar los 50 caracteres.',
 
+                'start_date.date' =>
+                    'La fecha de inicio debe ser una fecha válida.',
 
-public function show($id)
-{
-    $plan = AcademicPlan::with('academicProgram')->findOrFail($id);
+                'end_date.date' =>
+                    'La fecha de fin debe ser una fecha válida.',
 
-    return response()->json([
-        'success' => true,
-        'data' => $plan,
-    ]);
-}
+                'end_date.after_or_equal' =>
+                    'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
 
-public function update(Request $request, $id)
-{
-    $plan = AcademicPlan::findOrFail($id);
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
 
-    $validated = $request->validate(
-        [
-            'academic_program_id' => 'required|exists:academic_programs,id',
+        $plan = AcademicPlan::create($validated);
 
-            'name' => 'required|string|max:255',
+        return response()->json([
+            'success' => true,
+            'data' => $plan,
+        ], 201);
+    }
 
-            'version' => 'required|string|max:50',
+    public function show($id)
+    {
+        $plan = AcademicPlan::with('academicProgram')
+            ->findOrFail($id);
 
-            'start_date' => 'nullable|date',
+        return response()->json([
+            'success' => true,
+            'data' => $plan,
+        ]);
+    }
 
-            'end_date' => 'nullable|date|after_or_equal:start_date',
+    public function update(Request $request, $id)
+    {
+        $plan = AcademicPlan::findOrFail($id);
 
-            'is_active' => 'boolean',
-        ],
-        [
-            'academic_program_id.required' =>
-                'El programa académico es obligatorio.',
+        $validated = $request->validate(
+            [
+                'academic_program_id' => [
+                    'required',
+                    'exists:academic_programs,id',
+                ],
 
-            'academic_program_id.exists' =>
-                'El programa académico seleccionado no existe.',
+                'name' => [
+                    'required',
+                    'string',
+                    'max:255',
+                    Rule::unique('academic_plans', 'name')
+                        ->where(
+                            'academic_program_id',
+                            $request->academic_program_id
+                        )
+                        ->ignore($plan->id),
+                ],
 
-            'name.required' =>
-                'El nombre del plan académico es obligatorio.',
+                'version' => 'required|string|max:50',
 
-            'name.max' =>
-                'El nombre del plan académico no puede superar los 255 caracteres.',
+                'start_date' => 'nullable|date',
 
-            'version.required' =>
-                'La versión del plan académico es obligatoria.',
+                'end_date' => 'nullable|date|after_or_equal:start_date',
 
-            'version.max' =>
-                'La versión no puede superar los 50 caracteres.',
+                'is_active' => 'boolean',
+            ],
+            [
+                'academic_program_id.required' =>
+                    'El programa académico es obligatorio.',
 
-            'start_date.date' =>
-                'La fecha de inicio debe ser una fecha válida.',
+                'academic_program_id.exists' =>
+                    'El programa académico seleccionado no existe.',
 
-            'end_date.date' =>
-                'La fecha de fin debe ser una fecha válida.',
+                'name.required' =>
+                    'El nombre del plan académico es obligatorio.',
 
-            'end_date.after_or_equal' =>
-                'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+                'name.unique' =>
+                    'Ya existe un plan académico con ese nombre para este programa.',
 
-            'is_active.boolean' =>
-                'El estado debe ser válido.',
-        ]
-    );
+                'name.max' =>
+                    'El nombre del plan académico no puede superar los 255 caracteres.',
 
-    $plan->update($validated);
+                'version.required' =>
+                    'La versión del plan académico es obligatoria.',
 
-    return response()->json([
-        'success' => true,
-        'data' => $plan,
-    ]);
-}
+                'version.max' =>
+                    'La versión no puede superar los 50 caracteres.',
 
+                'start_date.date' =>
+                    'La fecha de inicio debe ser una fecha válida.',
 
+                'end_date.date' =>
+                    'La fecha de fin debe ser una fecha válida.',
+
+                'end_date.after_or_equal' =>
+                    'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
+
+                'is_active.boolean' =>
+                    'El estado debe ser válido.',
+            ]
+        );
+
+        $plan->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'data' => $plan,
+        ]);
+    }
+
+   
 public function destroy($id)
 {
     $plan = AcademicPlan::findOrFail($id);
+
+    if (
+        $plan->academicRecords()->exists() ||
+        $plan->curriculumItems()->exists() ||
+        $plan->academicLevels()->exists()
+    ) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No se puede eliminar el plan académico porque tiene registros académicos, elementos curriculares o niveles asociados.',
+        ], 409);
+    }
 
     $plan->delete();
 
     return response()->json([
         'success' => true,
         'message' => 'Plan académico eliminado correctamente',
-    ]);
+    ], 200);
 }
+
+
 }
