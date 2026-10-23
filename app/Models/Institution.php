@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+
+
+
 
 class Institution extends Model
 {
@@ -21,6 +25,20 @@ class Institution extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            User::class,
+            'institution_user'
+        )
+            ->withPivot([
+                'id',
+                'person_id',
+                'is_active',
+            ])
+            ->withTimestamps();
+    }
 
     public function people(): HasMany
     {
