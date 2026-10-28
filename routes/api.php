@@ -35,11 +35,16 @@ Route::get('/students/{id}', [StudentController::class, 'show']);
 Route::post('/students', [StudentController::class, 'store']);
 Route::put('/students/{id}', [StudentController::class, 'update']);
 Route::delete('/students/{id}', [StudentController::class, 'destroy']);
-Route::get('/academic-programs', [AcademicProgramController::class, 'index']);
-Route::post('/academic-programs', [AcademicProgramController::class, 'store']);
-Route::get('/academic-programs/{id}', [AcademicProgramController::class, 'show']);
-Route::put('/academic-programs/{id}', [AcademicProgramController::class, 'update']);
-Route::delete('/academic-programs/{id}', [AcademicProgramController::class, 'destroy']);
+
+Route::middleware(['auth:sanctum', 'institution.access'])
+    ->group(function () {
+        Route::get('academic-programs', [AcademicProgramController::class, 'index']);
+        Route::post('academic-programs', [AcademicProgramController::class, 'store']);
+        Route::get('academic-programs/{id}', [AcademicProgramController::class, 'show']);
+        Route::put('academic-programs/{id}', [AcademicProgramController::class, 'update']);
+        Route::delete('academic-programs/{id}', [AcademicProgramController::class, 'destroy']);
+    });
+
 Route::get('/academic-plans', [AcademicPlanController::class, 'index']);
 Route::post('/academic-plans', [AcademicPlanController::class, 'store']);
 Route::get('/academic-plans/{id}', [AcademicPlanController::class, 'show']);
