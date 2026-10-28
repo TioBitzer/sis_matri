@@ -96,11 +96,11 @@ Route::post('/enrollment-details', [EnrollmentDetailController::class, 'store'])
 Route::get('/enrollment-details/{id}', [EnrollmentDetailController::class, 'show']);
 Route::put('/enrollment-details/{id}', [EnrollmentDetailController::class, 'update']);
 Route::delete('/enrollment-details/{id}', [EnrollmentDetailController::class, 'destroy']);
-Route::get('/academic-units', [AcademicUnitController::class, 'index']);
-Route::post('/academic-units', [AcademicUnitController::class, 'store']);
-Route::get('/academic-units/{id}', [AcademicUnitController::class, 'show']);
-Route::put('/academic-units/{id}', [AcademicUnitController::class, 'update']);
-Route::delete('/academic-units/{id}', [AcademicUnitController::class, 'destroy']);
+Route::get('/academic-units', [AcademicUnitController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
+Route::post('/academic-units', [AcademicUnitController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
+Route::get('/academic-units/{id}', [AcademicUnitController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
+Route::put('/academic-units/{id}', [AcademicUnitController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
+Route::delete('/academic-units/{id}', [AcademicUnitController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
         Route::get('/campuses', [CampusController::class, 'index']);

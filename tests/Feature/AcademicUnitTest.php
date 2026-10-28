@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AcademicUnit;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -14,6 +15,74 @@ use Tests\TestCase;
 class AcademicUnitTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Los tests funcionales mantienen sus fixtures, pero cada solicitud API
+     * se autentica en la institución correspondiente. NO se añade este helper
+     * a AcademicUnitTenantIsolationTest: allí se prueban solicitudes prohibidas.
+     */
+    private function academicUnitTenantTestHeaders($uri, array $data = []): array
+    {
+        $institution = null;
+        if (isset($data['institution_id'])) {
+            $institution = Institution::find($data['institution_id']);
+        }
+
+        if ($institution === null && preg_match('~^/api/academic-units/(\d+)$~', $uri, $matches)) {
+            $unit = AcademicUnit::find((int) $matches[1]);
+            if ($unit !== null) {
+                $institution = Institution::find($unit->institution_id);
+            }
+        }
+
+        if ($institution === null) {
+            $institution = Institution::query()->orderBy('id')->first();
+        }
+
+        if ($institution === null) {
+            $institution = Institution::create([
+                'name' => 'Institución de pruebas AcademicUnit',
+                'code' => 'AUNIT-TEST',
+                'type' => 'institute',
+                'is_active' => true,
+            ]);
+        }
+
+        // Los fixtures antiguos no explicitaban is_active.
+        if (! $institution->is_active) {
+            $institution->update(['is_active' => true]);
+        }
+
+        $user = User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $this->actingAs($user);
+
+        return ['X-Institution-Id' => (string) $institution->id];
+    }
+
+    public function getJson($uri, array $headers = [], $options = 0)
+    {
+        $headers = array_merge($this->academicUnitTenantTestHeaders($uri), $headers);
+        return parent::getJson($uri, $headers, $options);
+    }
+
+    public function postJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $headers = array_merge($this->academicUnitTenantTestHeaders($uri, $data), $headers);
+        return parent::postJson($uri, $data, $headers, $options);
+    }
+
+    public function putJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $headers = array_merge($this->academicUnitTenantTestHeaders($uri, $data), $headers);
+        return parent::putJson($uri, $data, $headers, $options);
+    }
+
+    public function deleteJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $headers = array_merge($this->academicUnitTenantTestHeaders($uri, $data), $headers);
+        return parent::deleteJson($uri, $data, $headers, $options);
+    }
 
     public function test_puede_crear_unidad_academica_con_todos_sus_campos(): void
     {
@@ -252,36 +321,17 @@ public function test_puede_listar_unidades_academicas_con_sus_instituciones(): v
 
     $response = $this->getJson('/api/academic-units');
 
+    // Una institución no puede ver el curso registrado en la otra.
     $response->assertStatus(200)
         ->assertJsonPath('success', true)
-        ->assertJsonCount(2, 'data')
-        ->assertJsonFragment([
-            'name' => 'Programación I',
-            'code' => 'PROG1',
-        ])
-        ->assertJsonFragment([
-            'name' => 'Base de Datos I',
-            'code' => 'BD1',
-        ]);
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.institution_id', $institution1->id)
+        ->assertJsonPath('data.0.name', 'Programación I');
 
     $units = $response->json('data');
-
-    $this->assertEqualsCanonicalizing(
-        [$institution1->id, $institution2->id],
-        array_column($units, 'institution_id')
-    );
-
-    foreach ($units as $unit) {
-        $this->assertArrayHasKey('institution', $unit);
-        $this->assertEquals(
-            $unit['institution_id'],
-            $unit['institution']['id']
-        );
-    }
-
+    $this->assertSame($institution1->id, $units[0]['institution']['id']);
     $this->assertDatabaseCount('academic_units', 2);
 }
-
 public function test_puede_actualizar_una_unidad_academica(): void
 {
     $institution = Institution::create([
