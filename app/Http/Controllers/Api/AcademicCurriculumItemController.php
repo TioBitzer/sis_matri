@@ -4,21 +4,38 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicCurriculumItem;
-use App\Models\AcademicLevel;
-use App\Models\AcademicPlan;
 use App\Models\AcademicUnit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class AcademicCurriculumItemController extends Controller
 {
-    public function index()
+    /**
+     * ID validado por el middleware institution.access.
+     * Nunca confiar en una institución proporcionada en el cuerpo de la petición.
+     */
+    private function institutionId(Request $request): int
     {
-        $items = AcademicCurriculumItem::with([
-            'academicPlan',
-            'academicLevel',
-            'academicUnit',
-        ])->get();
+        return (int) $request->attributes->get('institution_id');
+    }
+
+    /**
+     * AcademicCurriculumItem -> AcademicPlan -> AcademicProgram -> Institution.
+     * Todas las consultas por ID utilizan este scope para no exponer otros tenants.
+     */
+    private function scopedItems(int $institutionId)
+    {
+        return AcademicCurriculumItem::query()
+            ->whereHas('academicPlan.academicProgram', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            });
+    }
+
+    public function index(Request $request)
+    {
+        $items = $this->scopedItems($this->institutionId($request))
+            ->with(['academicPlan', 'academicLevel', 'academicUnit'])
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -29,13 +46,13 @@ class AcademicCurriculumItemController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate(
-            $this->rules($request),
+            $this->rules($request, $this->institutionId($request)),
             $this->messages()
         );
 
         $unit = AcademicUnit::findOrFail($validated['academic_unit_id']);
 
-        // Tomar los valores de la unidad solo si no fueron proporcionados.
+        // Mantener el comportamiento original: copiar créditos y horas si se omiten.
         $validated['credits'] ??= $unit->credits;
         $validated['hours'] ??= $unit->hours;
         $validated['is_required'] ??= true;
@@ -44,21 +61,15 @@ class AcademicCurriculumItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $item->load([
-                'academicPlan',
-                'academicLevel',
-                'academicUnit',
-            ]),
+            'data' => $item->load(['academicPlan', 'academicLevel', 'academicUnit']),
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $item = AcademicCurriculumItem::with([
-            'academicPlan',
-            'academicLevel',
-            'academicUnit',
-        ])->findOrFail($id);
+        $item = $this->scopedItems($this->institutionId($request))
+            ->with(['academicPlan', 'academicLevel', 'academicUnit'])
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -68,10 +79,11 @@ class AcademicCurriculumItemController extends Controller
 
     public function update(Request $request, $id)
     {
-        $item = AcademicCurriculumItem::findOrFail($id);
+        $institutionId = $this->institutionId($request);
+        $item = $this->scopedItems($institutionId)->findOrFail($id);
 
         $validated = $request->validate(
-            $this->rules($request, $item),
+            $this->rules($request, $institutionId, $item),
             $this->messages()
         );
 
@@ -79,17 +91,13 @@ class AcademicCurriculumItemController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $item->fresh()->load([
-                'academicPlan',
-                'academicLevel',
-                'academicUnit',
-            ]),
+            'data' => $item->fresh()->load(['academicPlan', 'academicLevel', 'academicUnit']),
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $item = AcademicCurriculumItem::findOrFail($id);
+        $item = $this->scopedItems($this->institutionId($request))->findOrFail($id);
         $item->delete();
 
         return response()->json([
@@ -99,14 +107,17 @@ class AcademicCurriculumItemController extends Controller
     }
 
     /**
-     * Reglas compartidas por creación y actualización.
-     * La combinación (plan, nivel, curso) debe ser única.
+     * El plan, nivel y curso deben pertenecer a la institución autenticada.
+     * El nivel debe pertenecer al plan solicitado y la combinación debe ser única.
      */
-    private function rules(Request $request, ?AcademicCurriculumItem $item = null): array
+    private function rules(Request $request, int $institutionId, ?AcademicCurriculumItem $item = null): array
     {
+        $planId = $request->input('academic_plan_id');
+        $levelId = $request->input('academic_level_id');
+
         $unitUnique = Rule::unique('academic_curriculum_items', 'academic_unit_id')
-            ->where('academic_plan_id', $request->input('academic_plan_id'))
-            ->where('academic_level_id', $request->input('academic_level_id'));
+            ->where('academic_plan_id', $planId)
+            ->where('academic_level_id', $levelId);
 
         if ($item !== null) {
             $unitUnique->ignore($item->id);
@@ -115,34 +126,28 @@ class AcademicCurriculumItemController extends Controller
         return [
             'academic_plan_id' => [
                 'required',
-                'exists:academic_plans,id',
+                'integer',
+                Rule::exists('academic_plans', 'id')
+                    ->where(function ($query) use ($institutionId) {
+                        $query->whereIn('academic_program_id', function ($subquery) use ($institutionId) {
+                            $subquery->select('id')
+                                ->from('academic_programs')
+                                ->where('institution_id', $institutionId);
+                        });
+                    }),
             ],
             'academic_level_id' => [
                 'required',
-                'exists:academic_levels,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    $level = AcademicLevel::find($value);
-
-                    if ($level && (int) $level->academic_plan_id !== (int) $request->input('academic_plan_id')) {
-                        $fail('El nivel académico seleccionado no pertenece al plan académico indicado.');
-                    }
-                },
+                'integer',
+                Rule::exists('academic_levels', 'id')
+                    ->where('academic_plan_id', $planId),
             ],
             'academic_unit_id' => [
                 'required',
-                'exists:academic_units,id',
+                'integer',
+                Rule::exists('academic_units', 'id')
+                    ->where('institution_id', $institutionId),
                 $unitUnique,
-                function ($attribute, $value, $fail) use ($request) {
-                    $plan = AcademicPlan::with('academicProgram')->find($request->input('academic_plan_id'));
-                    $unit = AcademicUnit::find($value);
-
-                    if (
-                        $plan && $plan->academicProgram && $unit &&
-                        (int) $plan->academicProgram->institution_id !== (int) $unit->institution_id
-                    ) {
-                        $fail('La unidad académica debe pertenecer a la institución del plan académico.');
-                    }
-                },
             ],
             'credits' => 'nullable|integer|min:0',
             'hours' => 'nullable|integer|min:0',
@@ -155,11 +160,11 @@ class AcademicCurriculumItemController extends Controller
     {
         return [
             'academic_plan_id.required' => 'El plan académico es obligatorio.',
-            'academic_plan_id.exists' => 'El plan académico seleccionado no existe.',
+            'academic_plan_id.exists' => 'El plan académico seleccionado no existe o no pertenece a esta institución.',
             'academic_level_id.required' => 'El nivel académico es obligatorio.',
-            'academic_level_id.exists' => 'El nivel académico seleccionado no existe.',
+            'academic_level_id.exists' => 'El nivel académico seleccionado no existe o no pertenece al plan académico indicado.',
             'academic_unit_id.required' => 'La unidad académica es obligatoria.',
-            'academic_unit_id.exists' => 'La unidad académica seleccionada no existe.',
+            'academic_unit_id.exists' => 'La unidad académica seleccionada no existe o no pertenece a esta institución.',
             'academic_unit_id.unique' => 'Esta unidad académica ya está registrada en este nivel y plan.',
             'credits.integer' => 'Los créditos deben ser un número entero.',
             'credits.min' => 'Los créditos no pueden ser negativos.',

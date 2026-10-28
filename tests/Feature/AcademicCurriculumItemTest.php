@@ -6,6 +6,7 @@ use App\Models\AcademicLevel;
 use App\Models\AcademicPlan;
 use App\Models\AcademicProgram;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,6 +14,70 @@ use Tests\TestCase;
 class AcademicCurriculumItemTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?User $usuarioTenant = null;
+    private ?int $institucionTenantId = null;
+
+    /**
+     * Las pruebas crean sus instituciones dentro de los métodos; seleccionar
+     * la primera institución al realizar la primera petición HTTP.
+     */
+    private function prepararTenantParaCurriculum(): void
+    {
+        $institution = Institution::query()->orderBy('id')->first();
+
+        if ($institution === null) {
+            $institution = Institution::create([
+                'name' => 'Institución de prueba para malla curricular',
+                'code' => 'TEST-CURRICULUM',
+                'type' => 'institute',
+                'is_active' => true,
+            ]);
+        }
+
+        if ($this->usuarioTenant === null) {
+            $this->usuarioTenant = User::factory()->create();
+        }
+
+        if ($this->institucionTenantId !== $institution->id) {
+            $this->usuarioTenant->institutions()->syncWithoutDetaching([
+                $institution->id => ['is_active' => true],
+            ]);
+            $this->institucionTenantId = $institution->id;
+        }
+
+        $this->actingAs($this->usuarioTenant);
+        $this->withHeader('X-Institution-Id', (string) $institution->id);
+    }
+
+    public function getJson($uri, array $headers = [], $options = 0)
+    {
+        $this->prepararTenantParaCurriculum();
+
+        return parent::getJson($uri, $headers, $options);
+    }
+
+    public function postJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $this->prepararTenantParaCurriculum();
+
+        return parent::postJson($uri, $data, $headers, $options);
+    }
+
+    public function putJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $this->prepararTenantParaCurriculum();
+
+        return parent::putJson($uri, $data, $headers, $options);
+    }
+
+    public function deleteJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        $this->prepararTenantParaCurriculum();
+
+        return parent::deleteJson($uri, $data, $headers, $options);
+    }
+
 
     /**
      * Crea institución, programa, plan, nivel y unidad para cada prueba.
