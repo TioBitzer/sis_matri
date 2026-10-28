@@ -2,15 +2,11 @@
 
 namespace App\Models;
 
-
-
-
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\QueryException;
 
 class User extends Authenticatable
 {
@@ -38,10 +34,8 @@ class User extends Authenticatable
 
     public function institutions(): BelongsToMany
     {
-        return $this->belongsToMany(
-            Institution::class,
-            'institution_user'
-        )
+        return $this->belongsToMany(Institution::class, 'institution_user')
+            ->using(InstitutionUser::class)
             ->withPivot([
                 'id',
                 'person_id',
