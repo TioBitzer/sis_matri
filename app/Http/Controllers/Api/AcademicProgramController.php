@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicProgram;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -91,11 +92,27 @@ class AcademicProgramController extends Controller
             ->where('institution_id', $institutionId)
             ->findOrFail($id);
 
+        // Mantener la integridad referencial: no borrar programas con dependencias.
+        $hasPlans = DB::table('academic_plans')
+            ->where('academic_program_id', $program->id)
+            ->exists();
+
+        $hasRecords = DB::table('academic_records')
+            ->where('academic_program_id', $program->id)
+            ->exists();
+
+        if ($hasPlans || $hasRecords) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar el programa porque tiene planes o historiales académicos asociados.',
+            ], 409);
+        }
+
         $program->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Programa academico eliminado correctamente.',
+            'message' => 'Programa académico eliminado correctamente.',
         ]);
     }
 

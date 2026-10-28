@@ -2,18 +2,38 @@
 
 namespace Tests\Feature;
 
-
 use App\Models\AcademicProgram;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
-
-
 
 class AcademicProgramTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Autentica un miembro activo y fija el contexto institucional autorizado.
+     */
+    private function autenticarEnInstitucion(Institution $institution): void
+    {
+        $user = User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+
+        $this->actingAs($user);
+        $this->withHeader('X-Institution-Id', (string) $institution->id);
+    }
+
+    /** Crea una institución autorizada para las pruebas de validación y 404. */
+    private function crearInstitucionAutorizada(): Institution
+    {
+        return Institution::create([
+            'name' => 'Institución autorizada',
+            'code' => 'AUTH',
+            'type' => 'institute',
+            'is_active' => true,
+        ]);
+    }
 
     public function test_puede_crear_programa_academico_con_todos_sus_campos(): void
     {
@@ -21,7 +41,10 @@ class AcademicProgramTest extends TestCase
             'name' => 'Instituto Tecnológico Demo',
             'code' => 'ITD',
             'type' => 'institute',
+            'is_active' => true,
         ]);
+
+        $this->autenticarEnInstitucion($institution);
 
         $response = $this->postJson('/api/academic-programs', [
             'institution_id' => $institution->id,
@@ -55,6 +78,7 @@ public function test_no_permite_programas_duplicados_en_la_misma_institucion(): 
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     AcademicProgram::create([
@@ -64,6 +88,8 @@ public function test_no_permite_programas_duplicados_en_la_misma_institucion(): 
         'description' => 'Carrera de programación',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->postJson('/api/academic-programs', [
         'institution_id' => $institution->id,
@@ -91,12 +117,14 @@ public function test_permite_mismo_nombre_de_programa_en_instituciones_diferente
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $institution2 = Institution::create([
         'name' => 'Universidad Demo',
         'code' => 'UD',
         'type' => 'university',
+        'is_active' => true,
     ]);
 
     AcademicProgram::create([
@@ -106,6 +134,8 @@ public function test_permite_mismo_nombre_de_programa_en_instituciones_diferente
         'description' => 'Programa del primer instituto',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution2);
 
     $response = $this->postJson('/api/academic-programs', [
         'institution_id' => $institution2->id,
@@ -135,6 +165,9 @@ public function test_permite_mismo_nombre_de_programa_en_instituciones_diferente
 
 public function test_no_permite_crear_programa_sin_campos_obligatorios(): void
 {
+    $institution = $this->crearInstitucionAutorizada();
+    $this->autenticarEnInstitucion($institution);
+
     $response = $this->postJson('/api/academic-programs', [
         'description' => 'Programa sin datos obligatorios',
         'is_active' => true,
@@ -152,6 +185,9 @@ public function test_no_permite_crear_programa_sin_campos_obligatorios(): void
 
 public function test_no_permite_crear_programa_con_institucion_inexistente(): void
 {
+    $institution = $this->crearInstitucionAutorizada();
+    $this->autenticarEnInstitucion($institution);
+
     $response = $this->postJson('/api/academic-programs', [
         'institution_id' => 99999,
         'name' => 'Desarrollo de Software',
@@ -174,6 +210,7 @@ public function test_puede_consultar_programa_academico_con_su_institucion(): vo
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -183,6 +220,8 @@ public function test_puede_consultar_programa_academico_con_su_institucion(): vo
         'description' => 'Programa de desarrollo de aplicaciones',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->getJson(
         "/api/academic-programs/{$program->id}"
@@ -209,12 +248,14 @@ public function test_puede_listar_programas_academicos_con_sus_instituciones(): 
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $institution2 = Institution::create([
         'name' => 'Universidad Demo',
         'code' => 'UD',
         'type' => 'university',
+        'is_active' => true,
     ]);
 
     AcademicProgram::create([
@@ -233,36 +274,30 @@ public function test_puede_listar_programas_academicos_con_sus_instituciones(): 
         'is_active' => true,
     ]);
 
+    // El listado debe limitarse a la institución del encabezado, no a todas.
+    $this->autenticarEnInstitucion($institution1);
     $response = $this->getJson('/api/academic-programs');
 
-    $response->assertStatus(200)
+    $response->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonCount(2, 'data')
-        ->assertJsonFragment([
-            'name' => 'Desarrollo de Software',
-            'code' => 'DS',
-        ])
-        ->assertJsonFragment([
-            'name' => 'Administración de Empresas',
-            'code' => 'AE',
-        ]);
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.institution_id', $institution1->id)
+        ->assertJsonPath('data.0.name', 'Desarrollo de Software')
+        ->assertJsonMissing(['name' => 'Administración de Empresas']);
 
-    $programs = $response->json('data');
+    $this->assertEquals($institution1->id, $response->json('data.0.institution.id'));
 
-    $this->assertEqualsCanonicalizing(
-        [$institution1->id, $institution2->id],
-        array_column($programs, 'institution_id')
-    );
+    // Un miembro de otra institución solo ve los programas de la suya.
+    $this->autenticarEnInstitucion($institution2);
+    $response = $this->getJson('/api/academic-programs');
 
-    foreach ($programs as $program) {
-        $this->assertArrayHasKey('institution', $program);
+    $response->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.institution_id', $institution2->id)
+        ->assertJsonPath('data.0.name', 'Administración de Empresas')
+        ->assertJsonMissing(['name' => 'Desarrollo de Software']);
 
-        $this->assertEquals(
-            $program['institution_id'],
-            $program['institution']['id']
-        );
-    }
-
+    $this->assertEquals($institution2->id, $response->json('data.0.institution.id'));
     $this->assertDatabaseCount('academic_programs', 2);
 }
 
@@ -272,6 +307,7 @@ public function test_puede_actualizar_un_programa_academico(): void
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -281,6 +317,8 @@ public function test_puede_actualizar_un_programa_academico(): void
         'description' => 'Programa de desarrollo de aplicaciones',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         "/api/academic-programs/{$program->id}",
@@ -322,6 +360,7 @@ public function test_no_permite_nombre_duplicado_al_actualizar_programa(): void
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program1 = AcademicProgram::create([
@@ -339,6 +378,8 @@ public function test_no_permite_nombre_duplicado_al_actualizar_programa(): void
         'description' => 'Carrera de administración',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         "/api/academic-programs/{$program2->id}",
@@ -373,6 +414,7 @@ public function test_permite_actualizar_programa_conservando_su_mismo_nombre(): 
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -382,6 +424,8 @@ public function test_permite_actualizar_programa_conservando_su_mismo_nombre(): 
         'description' => 'Programa de desarrollo de aplicaciones',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         "/api/academic-programs/{$program->id}",
@@ -417,6 +461,9 @@ public function test_permite_actualizar_programa_conservando_su_mismo_nombre(): 
 
 public function test_devuelve_404_al_consultar_programa_academico_inexistente(): void
 {
+    $institution = $this->crearInstitucionAutorizada();
+    $this->autenticarEnInstitucion($institution);
+
     $response = $this->getJson('/api/academic-programs/99999');
 
     $response->assertStatus(404);
@@ -430,6 +477,7 @@ public function test_no_permite_actualizar_programa_sin_campos_obligatorios(): v
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -439,6 +487,8 @@ public function test_no_permite_actualizar_programa_sin_campos_obligatorios(): v
         'description' => 'Programa de desarrollo de aplicaciones',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         "/api/academic-programs/{$program->id}",
@@ -473,6 +523,7 @@ public function test_no_permite_actualizar_programa_con_institucion_inexistente(
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -482,6 +533,8 @@ public function test_no_permite_actualizar_programa_con_institucion_inexistente(
         'description' => 'Programa de desarrollo de aplicaciones',
         'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         "/api/academic-programs/{$program->id}",
@@ -514,7 +567,10 @@ public function test_devuelve_404_al_actualizar_programa_academico_inexistente()
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->putJson(
         '/api/academic-programs/99999',
@@ -538,6 +594,7 @@ public function test_puede_eliminar_un_programa_academico(): void
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -552,6 +609,8 @@ public function test_puede_eliminar_un_programa_academico(): void
         'id' => $program->id,
         'name' => 'Desarrollo de Software',
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->deleteJson(
         "/api/academic-programs/{$program->id}"
@@ -577,6 +636,9 @@ public function test_puede_eliminar_un_programa_academico(): void
 
 public function test_devuelve_404_al_eliminar_programa_academico_inexistente(): void
 {
+    $institution = $this->crearInstitucionAutorizada();
+    $this->autenticarEnInstitucion($institution);
+
     $response = $this->deleteJson(
         '/api/academic-programs/99999'
     );
@@ -592,6 +654,7 @@ public function test_no_permite_eliminar_programa_con_planes_academicos(): void
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -612,6 +675,8 @@ public function test_no_permite_eliminar_programa_con_planes_academicos(): void
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->deleteJson(
         "/api/academic-programs/{$program->id}"
@@ -643,6 +708,7 @@ public function test_no_permite_eliminar_programa_con_historial_academico(): voi
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD',
         'type' => 'institute',
+        'is_active' => true,
     ]);
 
     $program = AcademicProgram::create([
@@ -685,6 +751,8 @@ public function test_no_permite_eliminar_programa_con_historial_academico(): voi
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+
+    $this->autenticarEnInstitucion($institution);
 
     $response = $this->deleteJson(
         "/api/academic-programs/{$program->id}"
