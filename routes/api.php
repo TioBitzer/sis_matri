@@ -53,11 +53,14 @@ Route::middleware(['auth:sanctum', 'institution.access'])
         Route::put('/academic-plans/{id}', [AcademicPlanController::class, 'update']);
         Route::delete('/academic-plans/{id}', [AcademicPlanController::class, 'destroy']);
     });
-Route::get('/academic-levels', [AcademicLevelController::class, 'index']);
-Route::post('/academic-levels', [AcademicLevelController::class, 'store']);
-Route::get('/academic-levels/{id}', [AcademicLevelController::class, 'show']);
-Route::put('/academic-levels/{id}', [AcademicLevelController::class, 'update']);
-Route::delete('/academic-levels/{id}', [AcademicLevelController::class, 'destroy']);
+Route::middleware(['auth:sanctum', 'institution.access'])
+    ->group(function () {
+        Route::get('/academic-levels', [AcademicLevelController::class, 'index']);
+        Route::post('/academic-levels', [AcademicLevelController::class, 'store']);
+        Route::get('/academic-levels/{id}', [AcademicLevelController::class, 'show']);
+        Route::put('/academic-levels/{id}', [AcademicLevelController::class, 'update']);
+        Route::delete('/academic-levels/{id}', [AcademicLevelController::class, 'destroy']);
+    });
 Route::get('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'index']);
 Route::post('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'store']);
 Route::get('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'show']);
