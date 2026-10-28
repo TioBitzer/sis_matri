@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 
@@ -12,6 +12,20 @@ use Tests\TestCase;
 class CampusTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Autentica un usuario miembro de la institución y selecciona su contexto.
+     * Las pruebas CRUD verifican reglas de negocio, no accesos anónimos.
+     */
+    private function authorizeFor(Institution $institution): void
+    {
+        $user = User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+
+        $this->actingAs($user);
+        $this->withHeader('X-Institution-Id', (string) $institution->id);
+    }
+
 
     public function test_can_create_a_campus(): void
     {
@@ -22,6 +36,8 @@ class CampusTest extends TestCase
             'type' => 'institute',
             'is_active' => true,
         ]);
+
+        $this->authorizeFor($institution);
 
         // Registrar una sede mediante la API
         $response = $this->postJson('/api/campuses', [
@@ -56,6 +72,8 @@ public function test_rejects_duplicate_campus_name_in_same_institution(): void
         'type' => 'institute',
         'is_active' => true,
     ]);
+
+        $this->authorizeFor($institution);
 
     // Registrar la primera sede
     $this->postJson('/api/campuses', [
@@ -98,6 +116,9 @@ public function test_allows_same_campus_name_in_different_institutions(): void
         'is_active' => true,
     ]);
 
+    // Cada solicitud se hace como miembro de la institución correspondiente.
+    $this->authorizeFor($institution1);
+
     // Primera institución registra su sede
     $this->postJson('/api/campuses', [
         'institution_id' => $institution1->id,
@@ -107,6 +128,7 @@ public function test_allows_same_campus_name_in_different_institutions(): void
     ])->assertCreated();
 
     // Segunda institución registra una sede con el mismo nombre
+    $this->authorizeFor($institution2);
     $response = $this->postJson('/api/campuses', [
         'institution_id' => $institution2->id,
         'name' => 'Sede Central',
@@ -124,6 +146,15 @@ public function test_allows_same_campus_name_in_different_institutions(): void
 
 public function test_rejects_missing_required_campus_fields(): void
 {
+    // Usuario autorizado en una institución real para llegar al controlador.
+    $institution = Institution::create([
+        'name' => 'Instituto de prueba',
+        'code' => 'ITD-CTX',
+        'type' => 'institute',
+        'is_active' => true,
+    ]);
+    $this->authorizeFor($institution);
+
     // Intentar crear una sede sin enviar datos
     $response = $this->postJson('/api/campuses', []);
 
@@ -140,6 +171,15 @@ public function test_rejects_missing_required_campus_fields(): void
 
 public function test_rejects_nonexistent_institution(): void
 {
+    // Usuario autorizado en una institución real para llegar al controlador.
+    $institution = Institution::create([
+        'name' => 'Instituto de prueba',
+        'code' => 'ITD-CTX',
+        'type' => 'institute',
+        'is_active' => true,
+    ]);
+    $this->authorizeFor($institution);
+
     // Intentar registrar una sede con una institución inexistente
     $response = $this->postJson('/api/campuses', [
         'institution_id' => 999999,
@@ -165,6 +205,8 @@ public function test_can_show_a_campus_with_its_institution(): void
         'type' => 'institute',
         'is_active' => true,
     ]);
+
+        $this->authorizeFor($institution);
 
     // Crear una sede
     $campus = \App\Models\Campus::create([
@@ -199,6 +241,8 @@ public function test_can_list_campuses_with_their_institutions(): void
         'type' => 'institute',
         'is_active' => true,
     ]);
+
+        $this->authorizeFor($institution);
 
     // Registrar dos sedes
     \App\Models\Campus::create([
@@ -244,6 +288,8 @@ public function test_can_update_a_campus(): void
         'is_active' => true,
     ]);
 
+        $this->authorizeFor($institution);
+
     // Crear una sede
     $campus = \App\Models\Campus::create([
         'institution_id' => $institution->id,
@@ -288,6 +334,8 @@ public function test_rejects_duplicate_campus_name_on_update(): void
         'type' => 'institute',
         'is_active' => true,
     ]);
+
+        $this->authorizeFor($institution);
 
     // Crear la primera sede
     $campus1 = \App\Models\Campus::create([
@@ -340,6 +388,8 @@ public function test_can_delete_a_campus(): void
         'is_active' => true,
     ]);
 
+        $this->authorizeFor($institution);
+
     // Crear una sede
     $campus = \App\Models\Campus::create([
         'institution_id' => $institution->id,
@@ -374,6 +424,15 @@ public function test_can_delete_a_campus(): void
 
 public function test_returns_404_when_campus_does_not_exist(): void
 {
+    // Usuario autorizado en una institución real para llegar al controlador.
+    $institution = Institution::create([
+        'name' => 'Instituto de prueba',
+        'code' => 'ITD-CTX',
+        'type' => 'institute',
+        'is_active' => true,
+    ]);
+    $this->authorizeFor($institution);
+
     // Intentar consultar una sede inexistente
     $response = $this->getJson('/api/campuses/999999');
 
