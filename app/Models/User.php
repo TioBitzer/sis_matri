@@ -10,6 +10,16 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
+
+    /**
+     * Valor por defecto para usuarios recien creados.
+     * La columna users.is_platform_admin tambien tiene DEFAULT FALSE.
+     * No agregar este campo a $fillable ni aceptarlo desde peticiones.
+     */
+    protected $attributes = [
+        'is_platform_admin' => false,
+    ];
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -29,6 +39,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_platform_admin' => 'boolean',
         ];
     }
 

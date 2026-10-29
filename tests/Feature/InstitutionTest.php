@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -13,8 +14,24 @@ class InstitutionTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function asPlatformAdmin(): void
+    {
+        $user = User::factory()->create();
+        $user->forceFill(['is_platform_admin' => true])->save();
+        $this->actingAs($user);
+    }
+
+    private function asInstitutionMember(Institution $institution): void
+    {
+        $user = User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $this->actingAs($user);
+        $this->withHeaders(['X-Institution-Id' => (string) $institution->id]);
+    }
+
     public function test_can_create_an_institution(): void
     {
+        $this->asPlatformAdmin();
         $response = $this->postJson('/api/institutions', [
             'name' => 'Instituto Tecnológico Demo',
             'code' => 'ITD001',
@@ -38,6 +55,7 @@ class InstitutionTest extends TestCase
     
 public function test_rejects_duplicate_institution_code(): void
 {
+        $this->asPlatformAdmin();
     // Registrar la primera institución
     Institution::create([
         'name' => 'Instituto Tecnológico Demo',
@@ -64,6 +82,7 @@ public function test_rejects_duplicate_institution_code(): void
 
 public function test_rejects_missing_required_institution_fields(): void
 {
+        $this->asPlatformAdmin();
     // Intentar crear una institución sin enviar datos
     $response = $this->postJson('/api/institutions', []);
 
@@ -89,6 +108,8 @@ public function test_can_show_an_institution(): void
         'is_active' => true,
     ]);
 
+    $this->asInstitutionMember($institution);
+
     $response = $this->getJson(
         '/api/institutions/' . $institution->id
     );
@@ -103,7 +124,7 @@ public function test_can_show_an_institution(): void
 
 public function test_can_list_institutions(): void
 {
-    Institution::create([
+    $selected = Institution::create([
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD001',
         'type' => 'institute',
@@ -117,17 +138,20 @@ public function test_can_list_institutions(): void
         'is_active' => true,
     ]);
 
+    $this->asInstitutionMember($selected);
+
     $response = $this->getJson('/api/institutions');
 
     $response->assertOk()
         ->assertJsonPath('success', true)
-        ->assertJsonCount(2, 'data')
+        ->assertJsonCount(1, 'data')
         ->assertJsonFragment(['code' => 'ITD001'])
-        ->assertJsonFragment(['code' => 'UNI001']);
+        ->assertJsonMissing(['code' => 'UNI001']);
 }
 
 public function test_can_update_an_institution(): void
 {
+        $this->asPlatformAdmin();
     $institution = Institution::create([
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD001',
@@ -162,6 +186,7 @@ public function test_can_update_an_institution(): void
 
 public function test_rejects_duplicate_institution_code_on_update(): void
 {
+        $this->asPlatformAdmin();
     $institution1 = Institution::create([
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD001',
@@ -202,6 +227,7 @@ public function test_rejects_duplicate_institution_code_on_update(): void
 
 public function test_can_update_institution_without_changing_own_code(): void
 {
+        $this->asPlatformAdmin();
     $institution = Institution::create([
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD001',
@@ -236,6 +262,7 @@ public function test_can_update_institution_without_changing_own_code(): void
 
 public function test_can_delete_an_institution(): void
 {
+        $this->asPlatformAdmin();
     $institution = Institution::create([
         'name' => 'Instituto Tecnológico Demo',
         'code' => 'ITD001',
@@ -265,6 +292,14 @@ public function test_can_delete_an_institution(): void
 public function test_returns_404_when_institution_does_not_exist(): void
 {
     // Consultar una institución inexistente
+    $selected = Institution::create([
+        'name' => 'Institución autorizada',
+        'code' => 'FIXTURE-INST-404',
+        'type' => 'institute',
+        'is_active' => true,
+    ]);
+    $this->asInstitutionMember($selected);
+
     $response = $this->getJson('/api/institutions/999999');
 
     // Laravel debe devolver HTTP 404
