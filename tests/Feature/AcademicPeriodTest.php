@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AcademicPeriod;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -14,6 +15,69 @@ use Tests\TestCase;
 class AcademicPeriodTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Solo para las pruebas funcionales heredadas; las 18 pruebas de aislamiento
+     * mantienen sus solicitudes deliberadamente no autorizadas sin alteraciones.
+     */
+    private function academicPeriodTenantTestHeaders($uri, array $data = []): array
+    {
+        $institution = null;
+
+        if (isset($data['institution_id'])) {
+            $institution = Institution::find($data['institution_id']);
+        }
+
+        if ($institution === null && preg_match('~^/api/academic-periods/(\d+)$~', $uri, $m)) {
+            $period = AcademicPeriod::find((int) $m[1]);
+            if ($period !== null) {
+                $institution = Institution::find($period->institution_id);
+            }
+        }
+
+        if ($institution === null) {
+            $institution = Institution::query()->orderBy('id')->first();
+        }
+
+        if ($institution === null) {
+            $institution = Institution::create([
+                'name' => 'Institución de pruebas AcademicPeriod',
+                'code' => 'APER-TEST',
+                'type' => 'institute',
+                'is_active' => true,
+            ]);
+        }
+
+        if (! $institution->is_active) {
+            $institution->update(['is_active' => true]);
+        }
+
+        $user = User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $this->actingAs($user);
+
+        return ['X-Institution-Id' => (string) $institution->id];
+    }
+
+    public function getJson($uri, array $headers = [], $options = 0)
+    {
+        return parent::getJson($uri, array_merge($this->academicPeriodTenantTestHeaders($uri), $headers), $options);
+    }
+
+    public function postJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        return parent::postJson($uri, $data, array_merge($this->academicPeriodTenantTestHeaders($uri, $data), $headers), $options);
+    }
+
+    public function putJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        return parent::putJson($uri, $data, array_merge($this->academicPeriodTenantTestHeaders($uri, $data), $headers), $options);
+    }
+
+    public function deleteJson($uri, array $data = [], array $headers = [], $options = 0)
+    {
+        return parent::deleteJson($uri, $data, array_merge($this->academicPeriodTenantTestHeaders($uri, $data), $headers), $options);
+    }
 
     public function test_puede_crear_un_periodo_academico_con_codigo(): void
     {
