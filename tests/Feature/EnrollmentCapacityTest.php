@@ -108,6 +108,14 @@ class EnrollmentCapacityTest extends TestCase
             ->where('enrollment_id', $enrollmentIds[0])
             ->value('id');
 
+        // TENANT_AUTH_CAPACITY_TESTS_V1
+        // Los endpoints ahora exigen Sanctum y membresia a la institucion elegida.
+        // Se autentica un usuario real de prueba; NO se desactiva ningun middleware.
+        $user = \App\Models\User::factory()->create();
+        $user->institutions()->attach($institutionId, ['is_active' => true]);
+        $this->actingAs($user);
+        $this->withHeader('X-Institution-Id', (string) $institutionId);
+
         return [
             'offering_id' => $offeringId,
             'enrollment_ids' => $enrollmentIds,
