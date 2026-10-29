@@ -17,10 +17,31 @@ class StudentTest extends TestCase
 {
     use RefreshDatabase;
 
+    // STUDENT_AUTH_LEGACY_TESTS_V1
+    private function ownedInstitution(array $data): Institution
+    {
+        $institution = Institution::create($data);
+        $user = \App\Models\User::factory()->create();
+        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $this->actingAs($user);
+        $this->withHeader('X-Institution-Id', (string) $institution->id);
+        return $institution;
+    }
+
+    private function authenticateForEmptyStudentRequest(): void
+    {
+        $this->ownedInstitution([
+            'name' => 'Instituto de Prueba',
+            'code' => 'TEST001',
+            'is_active' => true,
+        ]);
+    }
+
+
     public function test_can_create_a_student(): void
     {
         // 1. Crear una institución
-        $institution = Institution::create([
+        $institution = $this->ownedInstitution([
             'name' => 'Instituto de Prueba',
             'code' => 'TEST001',
             'is_active' => true,
@@ -57,7 +78,7 @@ class StudentTest extends TestCase
     }
     public function test_rejects_duplicate_student_code(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -97,7 +118,7 @@ class StudentTest extends TestCase
 
 public function test_rejects_duplicate_person_as_student(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -134,6 +155,7 @@ public function test_rejects_duplicate_person_as_student(): void
 
 public function test_rejects_missing_required_student_fields(): void
 {
+    $this->authenticateForEmptyStudentRequest();
     // Intentar registrar un estudiante sin datos
     $response = $this->postJson('/api/students', []);
 
@@ -151,7 +173,7 @@ public function test_rejects_missing_required_student_fields(): void
 
 public function test_rejects_invalid_student_status(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -178,7 +200,7 @@ public function test_rejects_invalid_student_status(): void
 
 public function test_can_update_a_student(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -216,7 +238,7 @@ public function test_can_update_a_student(): void
 
 public function test_rejects_duplicate_student_code_on_update(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -273,7 +295,7 @@ public function test_rejects_duplicate_student_code_on_update(): void
 
 public function test_can_update_student_without_changing_own_code(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -315,7 +337,7 @@ public function test_can_update_student_without_changing_own_code(): void
 
 public function test_can_show_a_student_with_person(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -346,7 +368,7 @@ public function test_can_show_a_student_with_person(): void
 
 public function test_can_list_students_with_their_person_data(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -391,7 +413,7 @@ public function test_can_list_students_with_their_person_data(): void
 
 public function test_can_delete_a_student(): void
 {
-    $institution = Institution::create([
+    $institution = $this->ownedInstitution([
         'name' => 'Instituto de Prueba',
         'code' => 'TEST001',
         'is_active' => true,
@@ -429,6 +451,7 @@ public function test_can_delete_a_student(): void
 
 public function test_returns_404_when_student_does_not_exist(): void
 {
+    $this->authenticateForEmptyStudentRequest();
     $response = $this->getJson('/api/students/999999');
 
     $response->assertNotFound();
