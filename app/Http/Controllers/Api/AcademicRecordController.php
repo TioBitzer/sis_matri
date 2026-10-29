@@ -18,11 +18,11 @@ class AcademicRecordController extends Controller
         'academicPlan',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => AcademicRecord::with(self::RELATIONS)->get(),
+            'data' => $this->recordsForInstitution($request)->with(self::RELATIONS)->get(),
         ]);
     }
 
@@ -38,9 +38,9 @@ class AcademicRecordController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $record = AcademicRecord::with(self::RELATIONS)->findOrFail($id);
+        $record = $this->recordsForInstitution($request)->with(self::RELATIONS)->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -50,7 +50,7 @@ class AcademicRecordController extends Controller
 
     public function update(Request $request, $id)
     {
-        $record = AcademicRecord::findOrFail($id);
+        $record = $this->recordsForInstitution($request)->findOrFail($id);
         $validated = $request->validate($this->rules($request), $this->messages());
 
         // Los datos de identidad académica deben mantenerse cuando existen matrículas.
@@ -74,9 +74,9 @@ class AcademicRecordController extends Controller
         ], 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $record = AcademicRecord::findOrFail($id);
+        $record = $this->recordsForInstitution($request)->findOrFail($id);
 
         if ($record->enrollments()->exists()) {
             return response()->json([
@@ -93,15 +93,43 @@ class AcademicRecordController extends Controller
         ], 200);
     }
 
+    /** Institution selected and authorized by the institution.access middleware. */
+    private function institutionId(Request $request): int
+    {
+        $institutionId = (int) $request->attributes->get('institution_id', 0);
+        abort_if($institutionId < 1, 403, 'La institución seleccionada no fue validada.');
+
+        return $institutionId;
+    }
+
+    /** Filter every read/write lookup by student, academic program and plan institution. */
+    private function recordsForInstitution(Request $request): \Illuminate\Database\Eloquent\Builder
+    {
+        $institutionId = $this->institutionId($request);
+
+        return AcademicRecord::query()
+            ->whereHas('student.person', fn ($query) => $query->where('institution_id', $institutionId))
+            ->whereHas('academicProgram', fn ($query) => $query->where('institution_id', $institutionId))
+            ->whereHas('academicPlan.academicProgram', fn ($query) => $query->where('institution_id', $institutionId));
+    }
+
     private function rules(Request $request): array
     {
+        $institutionId = $this->institutionId($request);
+
         return [
             'student_id' => [
                 'required', 'integer', 'exists:students,id',
-                function ($attribute, $value, $fail) use ($request) {
+                function ($attribute, $value, $fail) use ($request, $institutionId) {
                     $student = Student::with('person')->find($value);
                     $program = AcademicProgram::find($request->input('academic_program_id'));
 
+                    if ($student && (!$student->person ||
+                        (int) $student->person->institution_id !== $institutionId)) {
+                        $fail('El estudiante no pertenece a la institución seleccionada.');
+                    }
+
+                    // Conservar la validación original de coherencia entre estudiante y programa.
                     if ($student && $program && (
                         !$student->person ||
                         (int) $student->person->institution_id !== (int) $program->institution_id
@@ -110,11 +138,19 @@ class AcademicRecordController extends Controller
                     }
                 },
             ],
-            'academic_program_id' => ['required', 'integer', 'exists:academic_programs,id'],
+            'academic_program_id' => [
+                'required', 'integer',
+                Rule::exists('academic_programs', 'id')->where('institution_id', $institutionId),
+            ],
             'academic_plan_id' => [
                 'required', 'integer', 'exists:academic_plans,id',
-                function ($attribute, $value, $fail) use ($request) {
-                    $plan = AcademicPlan::find($value);
+                function ($attribute, $value, $fail) use ($request, $institutionId) {
+                    $plan = AcademicPlan::with('academicProgram')->find($value);
+
+                    if ($plan && (!$plan->academicProgram ||
+                        (int) $plan->academicProgram->institution_id !== $institutionId)) {
+                        $fail('El plan académico no pertenece a la institución seleccionada.');
+                    }
 
                     if ($plan && (int) $plan->academic_program_id !== (int) $request->input('academic_program_id')) {
                         $fail('El plan académico no pertenece al programa seleccionado.');

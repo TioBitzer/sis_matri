@@ -6,6 +6,7 @@ use App\Models\AcademicPlan;
 use App\Models\AcademicProgram;
 use App\Models\AcademicRecord;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,6 +14,8 @@ use Tests\TestCase;
 class AcademicRecordTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?int $selectedRecordInstitutionId = null;
 
     /** Datos independientes para cada caso, compatibles con SQLite en memoria. */
     private function context(string $suffix = 'A'): array
@@ -22,6 +25,16 @@ class AcademicRecordTest extends TestCase
             'code' => "IT{$suffix}",
             'type' => 'institute',
         ]);
+
+        // Solo el primer contexto define la institución de la solicitud.
+        // Los demás contextos representan datos de otras instituciones.
+        if ($this->selectedRecordInstitutionId === null) {
+            $user = User::factory()->create();
+            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($user);
+            $this->withHeader('X-Institution-Id', (string) $institution->id);
+            $this->selectedRecordInstitutionId = (int) $institution->id;
+        }
 
         $program = AcademicProgram::create([
             'institution_id' => $institution->id,
@@ -203,6 +216,7 @@ class AcademicRecordTest extends TestCase
 
     public function test_lista_vacia_si_no_hay_historiales(): void
     {
+        $this->context(); // Inicializa autenticación y la institución seleccionada.
         $this->getJson('/api/academic-records')
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
@@ -210,6 +224,7 @@ class AcademicRecordTest extends TestCase
 
     public function test_no_permite_crear_sin_campos_obligatorios(): void
     {
+        $this->context(); // Inicializa autenticación y la institución seleccionada.
         $this->postJson('/api/academic-records', [])
             ->assertStatus(422)
             ->assertJsonValidationErrors([
@@ -420,6 +435,7 @@ class AcademicRecordTest extends TestCase
 
     public function test_devuelve_404_al_consultar_historial_inexistente(): void
     {
+        $this->context(); // Inicializa autenticación y la institución seleccionada.
         $this->getJson('/api/academic-records/99999')->assertStatus(404);
     }
 
@@ -431,6 +447,7 @@ class AcademicRecordTest extends TestCase
 
     public function test_devuelve_404_al_eliminar_historial_inexistente(): void
     {
+        $this->context(); // Inicializa autenticación y la institución seleccionada.
         $this->deleteJson('/api/academic-records/99999')->assertStatus(404);
     }
 
