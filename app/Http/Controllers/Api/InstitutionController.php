@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Institution;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class InstitutionController extends Controller
 {
@@ -81,11 +83,36 @@ class InstitutionController extends Controller
     public function destroy(Request $request, $id)
     {
         $this->requirePlatformAdmin($request);
-        $institution = Institution::findOrFail($id);
-        $institution->delete();
-        return response()->json([
-            'success' => true,
-            'message' => 'Institución eliminada correctamente',
-        ]);
+
+        // BLOQUEO DE BORRADO TENANT V1:
+        // No destruir por cascada ninguna institucion que tenga datos vinculados.
+        // Se bloquea la fila mientras se comprueba y ejecuta la eliminacion.
+        return DB::transaction(function () use ($id) {
+            $institution = Institution::query()->lockForUpdate()->findOrFail($id);
+
+            // Las tablas con institution_id incluyen, por ejemplo, sedes,
+            // personas, periodos, programas, unidades y la tabla pivot
+            // institution_user. Se inspecciona el esquema para cubrir tambien
+            // nuevas tablas propias del tenant que se agreguen en el futuro.
+            foreach (Schema::getTableListing() as $table) {
+                if ($table === $institution->getTable() || !Schema::hasColumn($table, 'institution_id')) {
+                    continue;
+                }
+
+                if (DB::table($table)->where('institution_id', $institution->id)->exists()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No se puede eliminar la institución porque tiene datos asociados. Puede desactivarla para conservar su historial.',
+                    ], 409);
+                }
+            }
+
+            $institution->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Institución eliminada correctamente',
+            ]);
+        });
     }
 }
