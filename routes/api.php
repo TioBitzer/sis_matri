@@ -76,11 +76,11 @@ Route::post('/academic-offerings', [AcademicOfferingController::class, 'store'])
 Route::get('/academic-offerings/{id}', [AcademicOfferingController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
 Route::put('/academic-offerings/{id}', [AcademicOfferingController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
 Route::delete('/academic-offerings/{id}', [AcademicOfferingController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/teaching-assignments', [TeachingAssignmentController::class, 'index']);
-Route::post('/teaching-assignments', [TeachingAssignmentController::class, 'store']);
-Route::get('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'show']);
-Route::put('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'update']);
-Route::delete('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'destroy']);
+Route::get('/teaching-assignments', [TeachingAssignmentController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
+Route::post('/teaching-assignments', [TeachingAssignmentController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
+Route::get('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
+Route::put('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
+Route::delete('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
 Route::get('/academic-records', [AcademicRecordController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
 Route::post('/academic-records', [AcademicRecordController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
 Route::get('/academic-records/{id}', [AcademicRecordController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
