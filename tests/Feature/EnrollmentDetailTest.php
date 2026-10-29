@@ -10,6 +10,7 @@ use App\Models\AcademicRecord;
 use App\Models\Enrollment;
 use App\Models\EnrollmentDetail;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -21,6 +22,8 @@ class EnrollmentDetailTest extends TestCase
     private const ENDPOINT = '/api/enrollment-details';
 
     private int $sequence = 0;
+
+    private ?int $selectedInstitutionId = null;
 
     private function context(string $suffix = 'A', int $capacity = 3): array
     {
@@ -66,6 +69,14 @@ class EnrollmentDetailTest extends TestCase
         $context = compact('institution', 'program', 'plan', 'level', 'unitId', 'periodId', 'campusId');
         $context['enrollment'] = $this->makeEnrollment($context);
         $context['offering'] = $this->makeOffering($context, 'A', $capacity);
+
+        if ($this->selectedInstitutionId === null) {
+            $this->selectedInstitutionId = $institution->id;
+            $user = User::factory()->create();
+            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($user);
+            $this->withHeader('X-Institution-Id', (string) $institution->id);
+        }
 
         return $context;
     }
@@ -213,6 +224,7 @@ class EnrollmentDetailTest extends TestCase
 
     public function test_lista_vacia_sin_detalles(): void
     {
+        $this->context();
         $this->getJson(self::ENDPOINT)->assertStatus(200)->assertJsonCount(0, 'data');
     }
 
@@ -227,6 +239,7 @@ class EnrollmentDetailTest extends TestCase
 
     public function test_rechaza_creacion_sin_campos_obligatorios(): void
     {
+        $this->context();
         $this->postJson(self::ENDPOINT, [])->assertStatus(422)
             ->assertJsonValidationErrors(['enrollment_id', 'academic_offering_id', 'status']);
     }
@@ -681,6 +694,7 @@ class EnrollmentDetailTest extends TestCase
 
     public function test_devuelve_404_al_consultar_detalle_inexistente(): void
     {
+        $this->context();
         $this->getJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 
@@ -692,6 +706,7 @@ class EnrollmentDetailTest extends TestCase
 
     public function test_devuelve_404_al_eliminar_detalle_inexistente(): void
     {
+        $this->context();
         $this->deleteJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 

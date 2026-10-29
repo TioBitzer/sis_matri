@@ -26,24 +26,24 @@ class EnrollmentDetailController extends Controller
 
     private const STATUSES = ['active', 'cancelled', 'completed'];
 
-    public function index()
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => EnrollmentDetail::with(self::RELATIONS)->get(),
+            'data' => $this->detailsForInstitution($request)->with(self::RELATIONS)->get(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules());
+        $data = $request->validate($this->rules($request));
 
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $request) {
             // Serializa los cambios de una misma matrícula antes de reservar vacantes.
-            $enrollment = Enrollment::whereKey($data['enrollment_id'])
-                ->lockForUpdate()->firstOrFail();
-            $offering = AcademicOffering::whereKey($data['academic_offering_id'])
-                ->lockForUpdate()->firstOrFail();
+            $enrollment = $this->enrollmentsForInstitution($request)
+                ->whereKey($data['enrollment_id'])->lockForUpdate()->firstOrFail();
+            $offering = $this->offeringsForInstitution($request)
+                ->whereKey($data['academic_offering_id'])->lockForUpdate()->firstOrFail();
 
             $this->validateEnrollmentOffering($enrollment, $offering);
             $this->validateDuplicate($enrollment, $offering);
@@ -63,9 +63,9 @@ class EnrollmentDetailController extends Controller
         }, 3);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $detail = EnrollmentDetail::with(self::RELATIONS)->findOrFail($id);
+        $detail = $this->detailsForInstitution($request)->with(self::RELATIONS)->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -75,13 +75,15 @@ class EnrollmentDetailController extends Controller
 
     public function update(Request $request, $id)
     {
-        $data = $request->validate($this->rules());
+        // El registro ajeno debe devolver 404, incluso con datos de entrada inválidos.
+        $this->detailsForInstitution($request)->whereKey($id)->firstOrFail();
+        $data = $request->validate($this->rules($request));
 
-        return DB::transaction(function () use ($id, $data) {
-            $snapshot = EnrollmentDetail::findOrFail($id);
+        return DB::transaction(function () use ($id, $data, $request) {
+            $snapshot = $this->detailsForInstitution($request)->findOrFail($id);
 
             // Se bloquean las matrículas en un orden estable para evitar carreras.
-            $enrollments = Enrollment::whereIn('id', [
+            $enrollments = $this->enrollmentsForInstitution($request)->whereIn('id', [
                 $snapshot->enrollment_id,
                 $data['enrollment_id'],
             ])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
@@ -92,7 +94,7 @@ class EnrollmentDetailController extends Controller
             }
 
             // Bloqueos de las dos secciones, siempre por ID ascendente.
-            $offerings = AcademicOffering::whereIn('id', [
+            $offerings = $this->offeringsForInstitution($request)->whereIn('id', [
                 $snapshot->academic_offering_id,
                 $data['academic_offering_id'],
             ])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
@@ -102,7 +104,7 @@ class EnrollmentDetailController extends Controller
                 abort(404, 'Oferta académica no encontrada.');
             }
 
-            $detail = EnrollmentDetail::whereKey($id)->lockForUpdate()->firstOrFail();
+            $detail = $this->detailsForInstitution($request)->whereKey($id)->lockForUpdate()->firstOrFail();
             if (
                 (int) $detail->enrollment_id !== (int) $snapshot->enrollment_id ||
                 (int) $detail->academic_offering_id !== (int) $snapshot->academic_offering_id
@@ -141,18 +143,18 @@ class EnrollmentDetailController extends Controller
         }, 3);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        return DB::transaction(function () use ($id) {
-            $snapshot = EnrollmentDetail::findOrFail($id);
+        return DB::transaction(function () use ($id, $request) {
+            $snapshot = $this->detailsForInstitution($request)->findOrFail($id);
 
             // El mismo orden de bloqueo utilizado por store y update.
-            Enrollment::whereKey($snapshot->enrollment_id)
+            $this->enrollmentsForInstitution($request)->whereKey($snapshot->enrollment_id)
                 ->lockForUpdate()->firstOrFail();
-            AcademicOffering::whereKey($snapshot->academic_offering_id)
+            $this->offeringsForInstitution($request)->whereKey($snapshot->academic_offering_id)
                 ->lockForUpdate()->firstOrFail();
 
-            $detail = EnrollmentDetail::whereKey($id)->lockForUpdate()->firstOrFail();
+            $detail = $this->detailsForInstitution($request)->whereKey($id)->lockForUpdate()->firstOrFail();
             if (
                 (int) $detail->enrollment_id !== (int) $snapshot->enrollment_id ||
                 (int) $detail->academic_offering_id !== (int) $snapshot->academic_offering_id
@@ -169,13 +171,76 @@ class EnrollmentDetailController extends Controller
         }, 3);
     }
 
-    private function rules(): array
+    /**
+     * La institución efectiva proviene exclusivamente del middleware institution.access.
+     * Cada relación se comprueba por separado, no solo por su coherencia mutua.
+     */
+    private function rules(Request $request): array
     {
         return [
-            'enrollment_id' => ['required', 'integer', 'exists:enrollments,id'],
-            'academic_offering_id' => ['required', 'integer', 'exists:academic_offerings,id'],
+            'enrollment_id' => [
+                'required', 'integer', 'exists:enrollments,id',
+                function ($attribute, $value, $fail) use ($request) {
+                    if (!$this->enrollmentsForInstitution($request)->whereKey($value)->exists()) {
+                        $fail('La matrícula no pertenece a la institución seleccionada.');
+                    }
+                },
+            ],
+            'academic_offering_id' => [
+                'required', 'integer', 'exists:academic_offerings,id',
+                function ($attribute, $value, $fail) use ($request) {
+                    if (!$this->offeringsForInstitution($request)->whereKey($value)->exists()) {
+                        $fail('La oferta académica no pertenece a la institución seleccionada.');
+                    }
+                },
+            ],
             'status' => ['required', 'string', Rule::in(self::STATUSES)],
         ];
+    }
+
+    private function enrollmentsForInstitution(Request $request)
+    {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
+        return Enrollment::query()
+            ->whereHas('student.person', fn ($q) => $q->where('institution_id', $institutionId))
+            ->whereHas('academicPeriod', fn ($q) => $q->where('institution_id', $institutionId))
+            ->whereHas('academicRecord.academicProgram', fn ($q) => $q->where('institution_id', $institutionId));
+    }
+
+    private function offeringsForInstitution(Request $request)
+    {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
+        return AcademicOffering::query()
+            ->whereHas('academicUnit', fn ($q) => $q->where('institution_id', $institutionId))
+            ->whereHas('academicPeriod', fn ($q) => $q->where('institution_id', $institutionId))
+            ->where(function ($query) use ($institutionId) {
+                $query->whereNull('campus_id')->orWhereHas(
+                    'campus', fn ($q) => $q->where('institution_id', $institutionId)
+                );
+            });
+    }
+
+    private function detailsForInstitution(Request $request)
+    {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
+        return EnrollmentDetail::query()
+            ->whereHas('enrollment', function ($q) use ($institutionId) {
+                $q->whereHas('student.person', fn ($r) => $r->where('institution_id', $institutionId))
+                  ->whereHas('academicPeriod', fn ($r) => $r->where('institution_id', $institutionId))
+                  ->whereHas('academicRecord.academicProgram', fn ($r) => $r->where('institution_id', $institutionId));
+            })
+            ->whereHas('academicOffering', function ($q) use ($institutionId) {
+                $q->whereHas('academicUnit', fn ($r) => $r->where('institution_id', $institutionId))
+                  ->whereHas('academicPeriod', fn ($r) => $r->where('institution_id', $institutionId))
+                  ->where(function ($r) use ($institutionId) {
+                      $r->whereNull('campus_id')->orWhereHas(
+                          'campus', fn ($s) => $s->where('institution_id', $institutionId)
+                      );
+                  });
+            });
     }
 
     private function validateEnrollmentOffering(Enrollment $enrollment, AcademicOffering $offering): void
