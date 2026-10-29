@@ -7,6 +7,7 @@ use App\Models\Institution;
 use App\Models\Person;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -17,6 +18,8 @@ class TeachingAssignmentTest extends TestCase
 
     private const ENDPOINT = '/api/teaching-assignments';
 
+    private ?int $selectedInstitutionId = null;
+
     /** Datos de una institución coherentes con las migraciones del proyecto. */
     private function context(string $suffix = 'A'): array
     {
@@ -25,6 +28,14 @@ class TeachingAssignmentTest extends TestCase
             'code' => "INST{$suffix}",
             'type' => 'institute',
         ]);
+
+        if ($this->selectedInstitutionId === null) {
+            $this->selectedInstitutionId = $institution->id;
+            $user = User::factory()->create();
+            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($user);
+            $this->withHeader('X-Institution-Id', (string) $institution->id);
+        }
 
         $unitId = DB::table('academic_units')->insertGetId([
             'institution_id' => $institution->id,
@@ -156,6 +167,7 @@ class TeachingAssignmentTest extends TestCase
 
     public function test_lista_vacia_si_no_existen_asignaciones(): void
     {
+        $this->context();
         $this->getJson(self::ENDPOINT)->assertStatus(200)
             ->assertJsonPath('success', true)->assertJsonCount(0, 'data');
     }
@@ -174,6 +186,7 @@ class TeachingAssignmentTest extends TestCase
 
     public function test_no_permite_crear_sin_campos_obligatorios(): void
     {
+        $this->context();
         $this->postJson(self::ENDPOINT, [])
             ->assertStatus(422)->assertJsonValidationErrors(['teacher_id', 'academic_offering_id']);
         $this->assertDatabaseCount('teaching_assignments', 0);
@@ -378,18 +391,23 @@ class TeachingAssignmentTest extends TestCase
             ->assertStatus(200)->assertJsonPath('data.academic_offering_id', $second->id);
     }
 
-    public function test_permite_mover_docente_y_oferta_juntos_a_otra_institucion(): void
+    public function test_no_permite_mover_docente_y_oferta_juntos_a_otra_institucion(): void
     {
         $first = $this->context('A');
         $second = $this->context('B');
-        $assignment = $this->assignment($this->teacher($first), $this->offering($first));
+        $originalTeacher = $this->teacher($first);
+        $originalOffering = $this->offering($first);
+        $assignment = $this->assignment($originalTeacher, $originalOffering);
         $newTeacher = $this->teacher($second);
         $newOffering = $this->offering($second);
 
         $this->putJson(self::ENDPOINT . "/{$assignment->id}", $this->payload($newTeacher, $newOffering))
-            ->assertStatus(200)
-            ->assertJsonPath('data.teacher_id', $newTeacher->id)
-            ->assertJsonPath('data.academic_offering_id', $newOffering->id);
+            ->assertStatus(422)->assertJsonValidationErrors('teacher_id');
+        $this->assertDatabaseHas('teaching_assignments', [
+            'id' => $assignment->id,
+            'teacher_id' => $originalTeacher->id,
+            'academic_offering_id' => $originalOffering->id,
+        ]);
     }
 
     public function test_no_permite_duplicar_al_actualizar(): void
@@ -526,16 +544,19 @@ class TeachingAssignmentTest extends TestCase
 
     public function test_devuelve_404_al_consultar_asignacion_inexistente(): void
     {
+        $this->context();
         $this->getJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 
     public function test_devuelve_404_al_actualizar_asignacion_inexistente(): void
     {
+        $this->context();
         $this->putJson(self::ENDPOINT . '/99999', [])->assertStatus(404);
     }
 
     public function test_devuelve_404_al_eliminar_asignacion_inexistente(): void
     {
+        $this->context();
         $this->deleteJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 

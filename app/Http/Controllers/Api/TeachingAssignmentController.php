@@ -7,6 +7,7 @@ use App\Models\AcademicOffering;
 use App\Models\Teacher;
 use App\Models\TeachingAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 
 class TeachingAssignmentController extends Controller
@@ -18,11 +19,11 @@ class TeachingAssignmentController extends Controller
         'academicOffering.campus',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => TeachingAssignment::with(self::RELATIONS)->get(),
+            'data' => $this->scopedAssignments($request)->with(self::RELATIONS)->get(),
         ]);
     }
 
@@ -37,9 +38,9 @@ class TeachingAssignmentController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $assignment = TeachingAssignment::with(self::RELATIONS)->findOrFail($id);
+        $assignment = $this->scopedAssignments($request)->with(self::RELATIONS)->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -49,7 +50,7 @@ class TeachingAssignmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $assignment = TeachingAssignment::findOrFail($id);
+        $assignment = $this->scopedAssignments($request)->findOrFail($id);
         $validated = $request->validate($this->rules($request, $assignment), $this->messages());
 
         $assignment->update($validated);
@@ -60,9 +61,9 @@ class TeachingAssignmentController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $assignment = TeachingAssignment::findOrFail($id);
+        $assignment = $this->scopedAssignments($request)->findOrFail($id);
         $assignment->delete();
 
         return response()->json([
@@ -73,6 +74,8 @@ class TeachingAssignmentController extends Controller
 
     private function rules(Request $request, ?TeachingAssignment $assignment = null): array
     {
+        $selectedInstitutionId = (int) $request->attributes->get('institution_id');
+
         // No bloquear la edición del rol de una asignación histórica si luego
         // el docente o la oferta se desactivaron. Sí exigir activos al crear
         // una asignación nueva o cambiar cualquiera de sus dos vínculos.
@@ -88,8 +91,14 @@ class TeachingAssignmentController extends Controller
                 Rule::unique('teaching_assignments', 'teacher_id')
                     ->where('academic_offering_id', $request->input('academic_offering_id'))
                     ->ignore($assignment?->id),
-                function ($attribute, $value, $fail) use ($changingLinks) {
-                    $teacher = Teacher::find($value);
+                function ($attribute, $value, $fail) use ($changingLinks, $selectedInstitutionId) {
+                    $teacher = Teacher::with('person')->find($value);
+                    if ($teacher && (
+                        (int) $teacher->institution_id !== $selectedInstitutionId
+                        || (int) $teacher->person?->institution_id !== $selectedInstitutionId
+                    )) {
+                        $fail('El docente no pertenece a la institución seleccionada.');
+                    }
                     if ($changingLinks && $teacher && !$teacher->is_active) {
                         $fail('No se puede asignar un docente inactivo.');
                     }
@@ -99,7 +108,7 @@ class TeachingAssignmentController extends Controller
                 'required',
                 'integer',
                 'exists:academic_offerings,id',
-                function ($attribute, $value, $fail) use ($request, $changingLinks) {
+                function ($attribute, $value, $fail) use ($request, $changingLinks, $selectedInstitutionId) {
                     $offering = AcademicOffering::with(['academicUnit', 'academicPeriod', 'campus'])
                         ->find($value);
                     $teacher = Teacher::find($request->input('teacher_id'));
@@ -113,6 +122,9 @@ class TeachingAssignmentController extends Controller
                     }
 
                     $institutionId = $offering->academicUnit?->institution_id;
+                    if ($institutionId === null || (int) $institutionId !== $selectedInstitutionId) {
+                        $fail('La oferta académica no pertenece a la institución seleccionada.');
+                    }
                     if (
                         $institutionId === null
                         || (int) $offering->academicPeriod?->institution_id !== (int) $institutionId
@@ -128,6 +140,27 @@ class TeachingAssignmentController extends Controller
             ],
             'role' => ['nullable', 'string', 'max:100'],
         ];
+    }
+
+    /**
+     * Aislar por la institución elegida, incluyendo las relaciones de la oferta.
+     * No se exige que el docente ni la oferta estén activos para consultar
+     * o editar un rol histórico: esas reglas siguen en rules().
+     */
+    private function scopedAssignments(Request $request): Builder
+    {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
+        return TeachingAssignment::query()
+            ->whereHas('teacher', fn (Builder $q) => $q
+                ->where('institution_id', $institutionId)
+                ->whereHas('person', fn (Builder $p) => $p->where('institution_id', $institutionId)))
+            ->whereHas('academicOffering', fn (Builder $q) => $q
+                ->whereHas('academicUnit', fn (Builder $u) => $u->where('institution_id', $institutionId))
+                ->whereHas('academicPeriod', fn (Builder $p) => $p->where('institution_id', $institutionId))
+                ->where(fn (Builder $o) => $o
+                    ->whereNull('campus_id')
+                    ->orWhereHas('campus', fn (Builder $c) => $c->where('institution_id', $institutionId))));
     }
 
     private function messages(): array
