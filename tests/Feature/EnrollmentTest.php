@@ -7,6 +7,7 @@ use App\Models\AcademicProgram;
 use App\Models\AcademicRecord;
 use App\Models\Enrollment;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -17,6 +18,9 @@ class EnrollmentTest extends TestCase
 
     private const ENDPOINT = '/api/enrollments';
 
+    /** Seleccionamos la primera institución creada dentro de cada prueba. */
+    private bool $tenantIsSelected = false;
+
     private function context(string $suffix = 'A'): array
     {
         $institution = Institution::create([
@@ -24,6 +28,14 @@ class EnrollmentTest extends TestCase
             'code' => "INST{$suffix}",
             'type' => 'institute',
         ]);
+
+        if (!$this->tenantIsSelected) {
+            $user = User::factory()->create();
+            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($user);
+            $this->withHeaders(['X-Institution-Id' => (string) $institution->id]);
+            $this->tenantIsSelected = true;
+        }
 
         $program = AcademicProgram::create([
             'institution_id' => $institution->id,
@@ -220,6 +232,7 @@ class EnrollmentTest extends TestCase
 
     public function test_lista_vacia_si_no_existen_matriculas(): void
     {
+        $this->context(); // Autenticación y selección de institución para esta prueba.
         $this->getJson(self::ENDPOINT)->assertStatus(200)
             ->assertJsonPath('success', true)->assertJsonCount(0, 'data');
     }
@@ -239,6 +252,7 @@ class EnrollmentTest extends TestCase
 
     public function test_no_permite_crear_sin_campos_obligatorios(): void
     {
+        $this->context(); // Autenticación y selección de institución para esta prueba.
         $this->postJson(self::ENDPOINT, [])->assertStatus(422)
             ->assertJsonValidationErrors([
                 'student_id', 'academic_period_id', 'academic_record_id', 'enrollment_date', 'status',
@@ -573,16 +587,19 @@ class EnrollmentTest extends TestCase
 
     public function test_devuelve_404_al_consultar_matricula_inexistente(): void
     {
+        $this->context(); // Autenticación y selección de institución para esta prueba.
         $this->getJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 
     public function test_devuelve_404_al_actualizar_matricula_inexistente(): void
     {
+        $this->context(); // Autenticación y selección de institución para esta prueba.
         $this->putJson(self::ENDPOINT . '/99999', [])->assertStatus(404);
     }
 
     public function test_devuelve_404_al_eliminar_matricula_inexistente(): void
     {
+        $this->context(); // Autenticación y selección de institución para esta prueba.
         $this->deleteJson(self::ENDPOINT . '/99999')->assertStatus(404);
     }
 

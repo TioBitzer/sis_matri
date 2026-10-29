@@ -25,17 +25,20 @@ class EnrollmentController extends Controller
         'active', 'pending', 'cancelled', 'completed', 'suspended', 'withdrawn', 'inactive',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => Enrollment::with(self::RELATIONS)->get(),
+            'data' => $this->tenantQuery($this->selectedInstitutionId($request))
+                ->with(self::RELATIONS)
+                ->get(),
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate($this->rules());
+        $this->validateTenantReferences($validated, $this->selectedInstitutionId($request));
         $this->validateCoherence($validated);
 
         $enrollment = Enrollment::create($validated);
@@ -46,9 +49,11 @@ class EnrollmentController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $enrollment = Enrollment::with(self::RELATIONS)->findOrFail($id);
+        $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -58,8 +63,10 @@ class EnrollmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $enrollment = Enrollment::findOrFail($id);
+        $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
+            ->findOrFail($id);
         $validated = $request->validate($this->rules());
+        $this->validateTenantReferences($validated, $this->selectedInstitutionId($request));
 
         // No se deben mover cursos inscritos a otro estudiante, expediente o período.
         if ($enrollment->enrollmentDetails()->exists() && (
@@ -82,9 +89,10 @@ class EnrollmentController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $enrollment = Enrollment::findOrFail($id);
+        $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
+            ->findOrFail($id);
 
         // enrollment_details tiene cascadeOnDelete: impedir pérdida accidental de cursos.
         if ($enrollment->enrollmentDetails()->exists()) {
@@ -100,6 +108,79 @@ class EnrollmentController extends Controller
             'success' => true,
             'message' => 'Matrícula eliminada correctamente',
         ]);
+    }
+
+    /** La institución seleccionada se determina solo por el middleware de acceso. */
+    private function selectedInstitutionId(Request $request): int
+    {
+        return (int) $request->attributes->get('institution_id');
+    }
+
+    /**
+     * Nunca consultar una matrícula solo por ID: debe pertenecer por todas sus
+     * relaciones principales a la institución autorizada en la solicitud.
+     */
+    private function tenantQuery(int $institutionId)
+    {
+        return Enrollment::query()
+            ->whereHas('student.person', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->whereHas('academicPeriod', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->whereHas('academicRecord.academicProgram', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            });
+    }
+
+    /**
+     * Una combinación coherente entre sí no basta: todas las referencias deben
+     * pertenecer a la institución elegida en X-Institution-Id.
+     */
+    private function validateTenantReferences(array $data, int $institutionId): void
+    {
+        $errors = [];
+
+        $studentBelongs = Student::query()
+            ->whereKey($data['student_id'])
+            ->whereHas('person', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })->exists();
+
+        if (!$studentBelongs) {
+            $errors['student_id'] = 'El estudiante no pertenece a la institución seleccionada.';
+        }
+
+        $periodBelongs = AcademicPeriod::query()
+            ->whereKey($data['academic_period_id'])
+            ->where('institution_id', $institutionId)
+            ->exists();
+
+        if (!$periodBelongs) {
+            $errors['academic_period_id'] = 'El período no pertenece a la institución seleccionada.';
+        }
+
+        $recordBelongs = AcademicRecord::query()
+            ->whereKey($data['academic_record_id'])
+            ->whereHas('student.person', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->whereHas('academicProgram', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->whereHas('academicPlan.academicProgram', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            })
+            ->exists();
+
+        if (!$recordBelongs) {
+            $errors['academic_record_id'] = 'El historial no pertenece a la institución seleccionada.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     private function rules(): array
