@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Institution;
 use App\Models\Person;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -12,13 +13,32 @@ class PersonTest extends TestCase
 {
     use RefreshDatabase;
 
+    // PERSON_AUTH_LEGACY_TESTS_V1
+    private ?User $tenantUser = null;
+
     private function institution(string $suffix = 'A'): Institution
     {
-        return Institution::create([
+        $institution = Institution::create([
             'name' => "Instituto Demo {$suffix}",
             'code' => "INST{$suffix}",
             'type' => 'institute',
         ]);
+
+        if ($this->tenantUser === null) {
+            $this->tenantUser = User::factory()->create();
+            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($this->tenantUser);
+            $this->selectPersonInstitution($institution);
+        } else {
+            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true]);
+        }
+
+        return $institution;
+    }
+
+    private function selectPersonInstitution(Institution $institution): void
+    {
+        $this->withHeader('X-Institution-Id', (string) $institution->id);
     }
 
     private function payload(Institution $institution, array $changes = []): array
@@ -113,6 +133,7 @@ class PersonTest extends TestCase
 
     public function test_lista_vacia_si_no_existen_personas(): void
     {
+        $this->institution();
         $this->getJson('/api/people')->assertStatus(200)
             ->assertJsonPath('success', true)
             ->assertJsonCount(0, 'data');
@@ -133,6 +154,7 @@ class PersonTest extends TestCase
 
     public function test_no_permite_crear_persona_sin_campos_obligatorios(): void
     {
+        $this->institution();
         $this->postJson('/api/people', [])
             ->assertStatus(422)
             ->assertJsonValidationErrors([
@@ -182,6 +204,7 @@ class PersonTest extends TestCase
         $first = $this->institution('A');
         $second = $this->institution('B');
         $this->person($first);
+        $this->selectPersonInstitution($second);
 
         $this->postJson('/api/people', $this->payload($second))
             ->assertStatus(201)
@@ -337,19 +360,18 @@ class PersonTest extends TestCase
         ]))->assertStatus(422)->assertJsonValidationErrors('email');
     }
 
-    public function test_permite_cambiar_de_institucion_a_persona_sin_dependencias(): void
+    public function test_no_permite_cambiar_de_institucion_a_persona_sin_dependencias(): void
     {
         $original = $this->institution('A');
         $target = $this->institution('B');
         $person = $this->person($original);
 
         $this->putJson("/api/people/{$person->id}", $this->payload($target))
-            ->assertStatus(200)
-            ->assertJsonPath('data.institution_id', $target->id);
-        $this->assertDatabaseHas('people', ['id' => $person->id, 'institution_id' => $target->id]);
+            ->assertStatus(422)->assertJsonValidationErrors('institution_id');
+        $this->assertDatabaseHas('people', ['id' => $person->id, 'institution_id' => $original->id]);
     }
 
-    public function test_no_permite_cambiar_a_institucion_con_documento_ya_registrado(): void
+    public function test_no_permite_trasladar_persona_a_institucion_con_documento_ya_registrado(): void
     {
         $original = $this->institution('A');
         $target = $this->institution('B');
@@ -357,7 +379,7 @@ class PersonTest extends TestCase
         $this->person($target);
 
         $this->putJson("/api/people/{$person->id}", $this->payload($target))
-            ->assertStatus(422)->assertJsonValidationErrors('document_number');
+            ->assertStatus(422)->assertJsonValidationErrors('institution_id');
         $this->assertDatabaseHas('people', ['id' => $person->id, 'institution_id' => $original->id]);
     }
 
@@ -375,6 +397,7 @@ class PersonTest extends TestCase
 
     public function test_devuelve_404_al_consultar_persona_inexistente(): void
     {
+        $this->institution();
         $this->getJson('/api/people/99999')->assertStatus(404);
     }
 
@@ -386,6 +409,7 @@ class PersonTest extends TestCase
 
     public function test_devuelve_404_al_eliminar_persona_inexistente(): void
     {
+        $this->institution();
         $this->deleteJson('/api/people/99999')->assertStatus(404);
     }
 
@@ -434,7 +458,7 @@ class PersonTest extends TestCase
         $studentId = $this->student($person);
 
         $this->putJson("/api/people/{$person->id}", $this->payload($target))
-            ->assertStatus(409)->assertJsonPath('success', false);
+            ->assertStatus(422)->assertJsonValidationErrors('institution_id');
         $this->assertDatabaseHas('people', ['id' => $person->id, 'institution_id' => $original->id]);
         $this->assertDatabaseHas('students', ['id' => $studentId, 'person_id' => $person->id]);
     }
