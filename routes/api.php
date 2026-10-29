@@ -30,11 +30,11 @@ Route::get('/test', function () {
     ]);
 });
 
-Route::get('/students', [StudentController::class, 'index']);
-Route::get('/students/{id}', [StudentController::class, 'show']);
-Route::post('/students', [StudentController::class, 'store']);
-Route::put('/students/{id}', [StudentController::class, 'update']);
-Route::delete('/students/{id}', [StudentController::class, 'destroy']);
+Route::get('/students', [StudentController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
+Route::get('/students/{id}', [StudentController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
+Route::post('/students', [StudentController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
+Route::put('/students/{id}', [StudentController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
+Route::delete('/students/{id}', [StudentController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
 
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
