@@ -6,6 +6,7 @@ use App\Models\AcademicOffering;
 use App\Models\AcademicPlan;
 use App\Models\AcademicProgram;
 use App\Models\Institution;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,6 +14,8 @@ use Tests\TestCase;
 class AcademicOfferingTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?int $selectedOfferingInstitutionId = null;
 
     /** Crea los datos mínimos de una institución para cada prueba. */
     private function context(string $suffix = 'A'): array
@@ -22,6 +25,16 @@ class AcademicOfferingTest extends TestCase
             'code' => "I{$suffix}",
             'type' => 'institute',
         ]);
+
+        // El primer contexto es el tenant de la solicitud. Los siguientes
+        // contextos solo crean datos ajenos para verificar el aislamiento.
+        if ($this->selectedOfferingInstitutionId === null) {
+            $user = User::factory()->create();
+            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->actingAs($user);
+            $this->withHeader('X-Institution-Id', (string) $institution->id);
+            $this->selectedOfferingInstitutionId = (int) $institution->id;
+        }
 
         $unitId = DB::table('academic_units')->insertGetId([
             'institution_id' => $institution->id,
@@ -167,6 +180,7 @@ class AcademicOfferingTest extends TestCase
 
     public function test_no_permite_crear_sin_campos_obligatorios(): void
     {
+        $this->context(); // Autenticar y seleccionar tenant para la solicitud.
         $this->postJson('/api/academic-offerings', [])
             ->assertStatus(422)->assertJsonValidationErrors([
                 'academic_unit_id', 'academic_period_id', 'campus_id', 'section', 'capacity',
@@ -382,6 +396,7 @@ class AcademicOfferingTest extends TestCase
 
     public function test_devuelve_404_al_consultar_oferta_inexistente(): void
     {
+        $this->context(); // Autenticar y seleccionar tenant para la solicitud.
         $this->getJson('/api/academic-offerings/99999')->assertStatus(404);
     }
 
@@ -393,6 +408,7 @@ class AcademicOfferingTest extends TestCase
 
     public function test_devuelve_404_al_eliminar_oferta_inexistente(): void
     {
+        $this->context(); // Autenticar y seleccionar tenant para la solicitud.
         $this->deleteJson('/api/academic-offerings/99999')->assertStatus(404);
     }
 }
