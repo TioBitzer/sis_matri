@@ -109,11 +109,11 @@ Route::middleware(['auth:sanctum', 'institution.access'])
         Route::put('/campuses/{id}', [CampusController::class, 'update']);
         Route::delete('/campuses/{id}', [CampusController::class, 'destroy']);
     });
-Route::get('/institutions', [InstitutionController::class, 'index']);
-Route::post('/institutions', [InstitutionController::class, 'store']);
-Route::get('/institutions/{id}', [InstitutionController::class, 'show']);
-Route::put('/institutions/{id}', [InstitutionController::class, 'update']);
-Route::delete('/institutions/{id}', [InstitutionController::class, 'destroy']);
+Route::get('/institutions', [InstitutionController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
+Route::post('/institutions', [InstitutionController::class, 'store'])->middleware(['auth:sanctum', \App\Http\Middleware\EnsurePlatformAdmin::class]);
+Route::get('/institutions/{id}', [InstitutionController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
+Route::put('/institutions/{id}', [InstitutionController::class, 'update'])->middleware(['auth:sanctum', \App\Http\Middleware\EnsurePlatformAdmin::class]);
+Route::delete('/institutions/{id}', [InstitutionController::class, 'destroy'])->middleware(['auth:sanctum', \App\Http\Middleware\EnsurePlatformAdmin::class]);
 Route::get('/people', [PersonController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
 Route::get('/people/{id}', [PersonController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
 Route::post('/people', [PersonController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
