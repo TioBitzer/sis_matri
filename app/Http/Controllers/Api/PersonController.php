@@ -9,17 +9,27 @@ use Illuminate\Validation\Rule;
 
 class PersonController extends Controller
 {
-    public function index()
+    // PERSON_TENANT_ISOLATION_V1: solo confiar en el contexto del middleware.
+    private function institutionId(Request $request): int
+    {
+        $id = (int) $request->attributes->get('institution_id', 0);
+        abort_if($id < 1, 403, 'No se ha validado la institución seleccionada.');
+        return $id;
+    }
+
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => Person::with('institution')->get(),
+            'data' => Person::with('institution')->where('institution_id', $this->institutionId($request))->get(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate($this->rules($request), $this->messages());
+        $institutionId = $this->institutionId($request);
+        $validated = $request->validate($this->rules($institutionId), $this->messages());
+        $validated['institution_id'] = $institutionId;
         $person = Person::create($validated);
 
         return response()->json([
@@ -28,9 +38,9 @@ class PersonController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $person = Person::with('institution')->findOrFail($id);
+        $person = Person::with('institution')->where('institution_id', $this->institutionId($request))->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -40,8 +50,10 @@ class PersonController extends Controller
 
     public function update(Request $request, $id)
     {
-        $person = Person::findOrFail($id);
-        $validated = $request->validate($this->rules($request, $person), $this->messages());
+        $institutionId = $this->institutionId($request);
+        $person = Person::where('institution_id', $institutionId)->findOrFail($id);
+        $validated = $request->validate($this->rules($institutionId, $person), $this->messages());
+        $validated['institution_id'] = $institutionId;
 
         // Cambiar de institución a una persona vinculada a alumnos o docentes
         // puede dejar datos académicos asociados a instituciones distintas.
@@ -63,9 +75,9 @@ class PersonController extends Controller
         ], 200);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $person = Person::findOrFail($id);
+        $person = Person::where('institution_id', $this->institutionId($request))->findOrFail($id);
 
         // La FK de students/person_id puede aplicar eliminación en cascada.
         // Protegemos explícitamente los registros académicos y docentes.
@@ -84,17 +96,17 @@ class PersonController extends Controller
         ], 200);
     }
 
-    private function rules(Request $request, ?Person $person = null): array
+    private function rules(int $institutionId, ?Person $person = null): array
     {
         $documentRule = Rule::unique('people', 'document_number')
-            ->where('institution_id', $request->input('institution_id'));
+            ->where('institution_id', $institutionId);
 
         if ($person !== null) {
             $documentRule->ignore($person->id);
         }
 
         return [
-            'institution_id' => ['required', 'integer', 'exists:institutions,id'],
+            'institution_id' => ['required', 'integer', Rule::in([$institutionId])],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'document_type' => ['required', 'string', 'max:20'],
@@ -110,6 +122,7 @@ class PersonController extends Controller
         return [
             'institution_id.required' => 'La institución es obligatoria.',
             'institution_id.exists' => 'La institución seleccionada no existe.',
+            'institution_id.in' => 'La institución no coincide con la institución seleccionada.',
             'first_name.required' => 'El nombre es obligatorio.',
             'last_name.required' => 'El apellido es obligatorio.',
             'document_type.required' => 'El tipo de documento es obligatorio.',
