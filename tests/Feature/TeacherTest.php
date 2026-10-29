@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Institution;
 use App\Models\Person;
 use App\Models\Teacher;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -13,13 +14,25 @@ class TeacherTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?User $authorizedUser = null;
+
     private function institution(string $suffix = 'A'): Institution
     {
-        return Institution::create([
+        $institution = Institution::create([
             'name' => "Instituto {$suffix}",
             'code' => "INST{$suffix}",
             'type' => 'institute',
         ]);
+
+        if ($this->authorizedUser === null) {
+            $this->authorizedUser = User::factory()->create();
+            $this->actingAs($this->authorizedUser);
+            $this->withHeader('X-Institution-Id', (string) $institution->id);
+        }
+
+        $this->authorizedUser->institutions()->attach($institution->id, ['is_active' => true]);
+
+        return $institution;
     }
 
     private function person(Institution $institution, string $suffix = '01'): Person
@@ -158,6 +171,7 @@ class TeacherTest extends TestCase
 
     public function test_lista_vacia_si_no_existen_docentes(): void
     {
+        $this->institution();
         $this->getJson('/api/teachers')->assertStatus(200)
             ->assertJsonPath('success', true)->assertJsonCount(0, 'data');
     }
@@ -175,11 +189,15 @@ class TeacherTest extends TestCase
     }
 
     public function test_no_permite_crear_sin_campos_obligatorios(): void
-    {
-        $this->postJson('/api/teachers', [])->assertStatus(422)
-            ->assertJsonValidationErrors(['person_id', 'institution_id']);
-        $this->assertDatabaseCount('teachers', 0);
-    }
+{
+    $this->institution(); // Inicializa usuario y membresía autorizada
+
+    $this->postJson('/api/teachers', [])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['person_id', 'institution_id']);
+
+    $this->assertDatabaseCount('teachers', 0);
+}
 
     public function test_no_permite_persona_inexistente(): void
     {
@@ -263,6 +281,8 @@ class TeacherTest extends TestCase
         $first = $this->institution('A');
         $second = $this->institution('B');
         $this->teacher($this->person($first), ['employee_code' => 'PROF001']);
+
+        $this->withHeader('X-Institution-Id', (string) $second->id);
 
         $this->postJson('/api/teachers', $this->payload(
             $this->person($second), ['employee_code' => 'PROF001']
@@ -443,7 +463,7 @@ class TeacherTest extends TestCase
         $this->assertDatabaseHas('teachers', ['id' => $teacher->id, 'person_id' => $newPerson->id]);
     }
 
-    public function test_permite_cambiar_institucion_con_nueva_persona_sin_asignaciones(): void
+    public function test_no_permite_cambiar_institucion_con_nueva_persona_sin_asignaciones(): void
     {
         $first = $this->institution('A');
         $second = $this->institution('B');
@@ -451,12 +471,16 @@ class TeacherTest extends TestCase
         $newPerson = $this->person($second);
 
         $this->putJson("/api/teachers/{$teacher->id}", $this->payload($newPerson))
-            ->assertStatus(200)->assertJsonPath('data.institution_id', $second->id)
-            ->assertJsonPath('data.person_id', $newPerson->id);
+            ->assertStatus(422)->assertJsonValidationErrors(['institution_id']);
+
+        $this->assertDatabaseHas('teachers', [
+            'id' => $teacher->id, 'institution_id' => $first->id,
+        ]);
     }
 
     public function test_devuelve_404_al_consultar_docente_inexistente(): void
     {
+        $this->institution();
         $this->getJson('/api/teachers/99999')->assertStatus(404);
     }
 
@@ -468,6 +492,7 @@ class TeacherTest extends TestCase
 
     public function test_devuelve_404_al_eliminar_docente_inexistente(): void
     {
+        $this->institution();
         $this->deleteJson('/api/teachers/99999')->assertStatus(404);
     }
 
@@ -535,7 +560,7 @@ class TeacherTest extends TestCase
 
         $this->putJson("/api/teachers/{$teacher->id}", $this->payload($newPerson, [
             'employee_code' => 'PROFOTRO',
-        ]))->assertStatus(409)->assertJsonPath('success', false);
+        ]))->assertStatus(422)->assertJsonValidationErrors(['institution_id']);
 
         $this->assertDatabaseHas('teachers', ['id' => $teacher->id, 'institution_id' => $first->id]);
     }

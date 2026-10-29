@@ -5,16 +5,31 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Person;
 use App\Models\Teacher;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class TeacherController extends Controller
 {
-    public function index()
+    /**
+     * Aisla los docentes de la institución activa y valida también su persona.
+     */
+    private function scopedTeachers(Request $request): Builder
+    {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
+        return Teacher::query()
+            ->where('institution_id', $institutionId)
+            ->whereHas('person', function ($query) use ($institutionId) {
+                $query->where('institution_id', $institutionId);
+            });
+    }
+
+    public function index(Request $request)
     {
         return response()->json([
             'success' => true,
-            'data' => Teacher::with(['person', 'institution'])->get(),
+            'data' => $this->scopedTeachers($request)->with(['person', 'institution'])->get(),
         ]);
     }
 
@@ -33,9 +48,10 @@ class TeacherController extends Controller
         ], 201);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $teacher = Teacher::with(['person', 'institution'])->findOrFail($id);
+        $teacher = $this->scopedTeachers($request)
+            ->with(['person', 'institution'])->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -45,7 +61,7 @@ class TeacherController extends Controller
 
     public function update(Request $request, $id)
     {
-        $teacher = Teacher::findOrFail($id);
+        $teacher = $this->scopedTeachers($request)->findOrFail($id);
         $validated = $request->validate($this->rules($request, $teacher), $this->messages());
 
         // La identidad y la institución de un docente con clases asignadas
@@ -71,9 +87,9 @@ class TeacherController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $teacher = Teacher::findOrFail($id);
+        $teacher = $this->scopedTeachers($request)->findOrFail($id);
 
         // La FK de teaching_assignments aplica cascadeOnDelete.
         // Evitamos borrar las asignaciones sin una decisión explícita.
@@ -94,9 +110,11 @@ class TeacherController extends Controller
 
     private function rules(Request $request, ?Teacher $teacher = null): array
     {
+        $institutionId = (int) $request->attributes->get('institution_id');
+
         $personUnique = Rule::unique('teachers', 'person_id');
         $codeUnique = Rule::unique('teachers', 'employee_code')
-            ->where('institution_id', $request->input('institution_id'));
+            ->where('institution_id', $institutionId);
 
         if ($teacher !== null) {
             $personUnique->ignore($teacher->id);
@@ -109,7 +127,7 @@ class TeacherController extends Controller
                 'integer',
                 'exists:people,id',
                 $personUnique,
-                function ($attribute, $value, $fail) use ($request) {
+                function ($attribute, $value, $fail) use ($request, $institutionId) {
                     $person = Person::find($value);
 
                     if (
@@ -118,9 +136,18 @@ class TeacherController extends Controller
                     ) {
                         $fail('La persona seleccionada no pertenece a la institución indicada.');
                     }
+
+                    if ($person !== null && (int) $person->institution_id !== $institutionId) {
+                        $fail('La persona seleccionada no pertenece a la institución activa.');
+                    }
                 },
             ],
-            'institution_id' => ['required', 'integer', 'exists:institutions,id'],
+            'institution_id' => [
+                'required',
+                'integer',
+                'exists:institutions,id',
+                Rule::in([$institutionId]),
+            ],
             'employee_code' => ['nullable', 'string', 'max:50', $codeUnique],
             'specialization' => ['nullable', 'string', 'max:255'],
             'is_active' => ['sometimes', 'boolean'],
