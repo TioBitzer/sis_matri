@@ -31,7 +31,7 @@ class EnrollmentTest extends TestCase
 
         if (!$this->tenantIsSelected) {
             $user = User::factory()->create();
-            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'registrar']);
             $this->actingAs($user);
             $this->withHeaders(['X-Institution-Id' => (string) $institution->id]);
             $this->tenantIsSelected = true;
