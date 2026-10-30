@@ -31,6 +31,7 @@ class Institution extends Model
                 'id',
                 'person_id',
                 'is_active',
+                'role',
             ])
             ->withTimestamps();
     }
