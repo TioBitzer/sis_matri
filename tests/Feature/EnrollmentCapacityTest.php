@@ -112,7 +112,7 @@ class EnrollmentCapacityTest extends TestCase
         // Los endpoints ahora exigen Sanctum y membresia a la institucion elegida.
         // Se autentica un usuario real de prueba; NO se desactiva ningun middleware.
         $user = \App\Models\User::factory()->create();
-        $user->institutions()->attach($institutionId, ['is_active' => true]);
+        $user->institutions()->attach($institutionId, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
         $this->withHeader('X-Institution-Id', (string) $institutionId);
 

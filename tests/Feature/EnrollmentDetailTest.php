@@ -73,7 +73,7 @@ class EnrollmentDetailTest extends TestCase
         if ($this->selectedInstitutionId === null) {
             $this->selectedInstitutionId = $institution->id;
             $user = User::factory()->create();
-            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'registrar']);
             $this->actingAs($user);
             $this->withHeader('X-Institution-Id', (string) $institution->id);
         }

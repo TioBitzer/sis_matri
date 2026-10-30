@@ -30,7 +30,7 @@ class AcademicRecordTest extends TestCase
         // Los demás contextos representan datos de otras instituciones.
         if ($this->selectedRecordInstitutionId === null) {
             $user = User::factory()->create();
-            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'registrar']);
             $this->actingAs($user);
             $this->withHeader('X-Institution-Id', (string) $institution->id);
             $this->selectedRecordInstitutionId = (int) $institution->id;
