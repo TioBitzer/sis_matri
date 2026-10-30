@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'institution.access' => \App\Http\Middleware\EnsureInstitutionAccess::class,
+            'institution.role' => \App\Http\Middleware\EnsureInstitutionRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
