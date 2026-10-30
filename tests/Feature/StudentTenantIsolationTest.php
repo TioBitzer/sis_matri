@@ -55,7 +55,7 @@ class StudentTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'registrar']);
         return $user;
     }
 
@@ -204,7 +204,7 @@ class StudentTenantIsolationTest extends TestCase
         $ownA = $this->student($a);
         $ownB = $this->student($b);
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($a['institution']))
@@ -220,7 +220,7 @@ class StudentTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($b),
@@ -234,7 +234,7 @@ class StudentTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($a),
@@ -289,7 +289,7 @@ class StudentTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT,
@@ -305,7 +305,7 @@ class StudentTenantIsolationTest extends TestCase
         $b = $this->context('B');
         $own = $this->student($a);
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->putJson(self::ENDPOINT.'/'.$own,
