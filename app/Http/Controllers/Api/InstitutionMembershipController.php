@@ -65,7 +65,7 @@ class InstitutionMembershipController extends Controller
 
             $now = now();
 
-            return DB::table('institution_user')->insertGetId([
+            $membershipId = DB::table('institution_user')->insertGetId([
                 'institution_id' => $institutionId,
                 'user_id' => $data['user_id'],
                 'person_id' => $data['person_id'] ?? null,
@@ -74,6 +74,20 @@ class InstitutionMembershipController extends Controller
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+            \App\Support\InstitutionMembershipAudit::record(
+                $institutionId,
+                (int) $membershipId,
+                (int) $data['user_id'],
+                (int) $request->user()->getAuthIdentifier(),
+                'created',
+                null,
+                [
+                    'role' => $data['role'] ?? 'member',
+                    'is_active' => $data['is_active'] ?? true,
+                    'person_id' => $data['person_id'] ?? null,
+                ]
+            );
+            return (int) $membershipId;
         }, 3);
 
         return response()->json([
@@ -115,6 +129,20 @@ class InstitutionMembershipController extends Controller
                 ->where('id', $id)
                 ->where('institution_id', $institutionId)
                 ->update(array_merge($data, ['updated_at' => now()]));
+
+            \App\Support\InstitutionMembershipAudit::record(
+                $institutionId,
+                (int) $current->id,
+                (int) $current->user_id,
+                (int) $request->user()->getAuthIdentifier(),
+                'updated',
+                $current,
+                [
+                    'role' => $data['role'] ?? $current->role,
+                    'is_active' => $data['is_active'] ?? (bool) $current->is_active,
+                    'person_id' => array_key_exists('person_id', $data) ? $data['person_id'] : $current->person_id,
+                ]
+            );
         }, 3);
 
         return response()->json([
@@ -145,6 +173,20 @@ class InstitutionMembershipController extends Controller
                 ->where('id', $id)
                 ->where('institution_id', $institutionId)
                 ->update(['is_active' => false, 'updated_at' => now()]);
+
+            \App\Support\InstitutionMembershipAudit::record(
+                $institutionId,
+                (int) $current->id,
+                (int) $current->user_id,
+                (int) $request->user()->getAuthIdentifier(),
+                'deactivated',
+                $current,
+                [
+                    'role' => $current->role,
+                    'is_active' => false,
+                    'person_id' => $current->person_id,
+                ]
+            );
         }, 3);
 
         return response()->json(['message' => 'Membresía desactivada correctamente.']);

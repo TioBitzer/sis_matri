@@ -138,3 +138,6 @@ Route::middleware([
     Route::patch('/institution-memberships/{id}', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'update']);
     Route::delete('/institution-memberships/{id}', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'destroy']);
 });
+
+// FASE 3C: solo lectura de auditoria institucional
+Route::get('/institution-membership-audits', [\App\Http\Controllers\Api\InstitutionMembershipAuditController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);

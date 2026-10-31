@@ -62,7 +62,7 @@ Artisan::command('inspire', function () {
                         ->where('institution_id', $institutionId)
                         ->where('user_id', $userId)
                         ->lockForUpdate()
-                        ->first(['id']);
+                        ->first(['id', 'role', 'is_active', 'person_id']);
 
                     $now = now();
 
@@ -74,6 +74,20 @@ Artisan::command('inspire', function () {
                                 'is_active' => true,
                                 'updated_at' => $now,
                             ]);
+                        \App\Support\InstitutionMembershipAudit::record(
+                            (int) $institutionId,
+                            (int) $membership->id,
+                            (int) $userId,
+                            null,
+                            'bootstrap_admin',
+                            $membership,
+                            [
+                                'role' => 'institution_admin',
+                                'is_active' => true,
+                                'person_id' => $membership->person_id,
+                            ],
+                            'console'
+                        );
                         return ['membership_id' => (int) $membership->id, 'action' => 'reactivada/promovida'];
                     }
 
@@ -86,7 +100,20 @@ Artisan::command('inspire', function () {
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]);
-
+                    \App\Support\InstitutionMembershipAudit::record(
+                        (int) $institutionId,
+                        (int) $membershipId,
+                        (int) $userId,
+                        null,
+                        'bootstrap_admin',
+                        null,
+                        [
+                            'role' => 'institution_admin',
+                            'is_active' => true,
+                            'person_id' => null,
+                        ],
+                        'console'
+                    );
                     return ['membership_id' => (int) $membershipId, 'action' => 'creada'];
                 },
                 3
