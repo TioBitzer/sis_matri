@@ -60,7 +60,7 @@ class TeacherTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -325,7 +325,7 @@ class TeacherTenantIsolationTest extends TestCase
         $teacherB = $this->teacher($b);
 
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($a['institution']))
@@ -346,7 +346,7 @@ class TeacherTenantIsolationTest extends TestCase
         $b = $this->context('B');
 
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(
@@ -362,7 +362,7 @@ class TeacherTenantIsolationTest extends TestCase
         $b = $this->context('B');
 
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($a), $this->headers($a['institution']))
@@ -397,7 +397,7 @@ class TeacherTenantIsolationTest extends TestCase
         $b = $this->context('B');
 
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(

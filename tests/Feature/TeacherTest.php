@@ -30,7 +30,7 @@ class TeacherTest extends TestCase
             $this->withHeader('X-Institution-Id', (string) $institution->id);
         }
 
-        $this->authorizedUser->institutions()->attach($institution->id, ['is_active' => true]);
+        $this->authorizedUser->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'institution_admin']);
 
         return $institution;
     }

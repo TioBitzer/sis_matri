@@ -26,11 +26,11 @@ class PersonTest extends TestCase
 
         if ($this->tenantUser === null) {
             $this->tenantUser = User::factory()->create();
-            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'institution_admin']);
             $this->actingAs($this->tenantUser);
             $this->selectPersonInstitution($institution);
         } else {
-            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true]);
+            $this->tenantUser->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'institution_admin']);
         }
 
         return $institution;
