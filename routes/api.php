@@ -124,3 +124,17 @@ Route::post('/teachers', [TeacherController::class, 'store'])->middleware(['auth
 Route::get('/teachers/{id}', [TeacherController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::put('/teachers/{id}', [TeacherController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
 Route::delete('/teachers/{id}', [TeacherController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+
+
+// FASE 3A: gestion segura de membresias (solo administradores institucionales).
+Route::middleware([
+    'auth:sanctum',
+    'institution.access',
+    'institution.role:institution_admin',
+])->group(function (): void {
+    Route::get('/institution-memberships', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'index']);
+    Route::get('/institution-memberships/{id}', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'show']);
+    Route::post('/institution-memberships', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'store']);
+    Route::patch('/institution-memberships/{id}', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'update']);
+    Route::delete('/institution-memberships/{id}', [\App\Http\Controllers\Api\InstitutionMembershipController::class, 'destroy']);
+});
