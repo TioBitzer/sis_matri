@@ -38,20 +38,20 @@ Route::delete('/students/{id}', [StudentController::class, 'destroy'])->middlewa
 
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
-        Route::get('academic-programs', [AcademicProgramController::class, 'index']);
-        Route::post('academic-programs', [AcademicProgramController::class, 'store']);
-        Route::get('academic-programs/{id}', [AcademicProgramController::class, 'show']);
-        Route::put('academic-programs/{id}', [AcademicProgramController::class, 'update']);
-        Route::delete('academic-programs/{id}', [AcademicProgramController::class, 'destroy']);
+        Route::get('academic-programs', [AcademicProgramController::class, 'index'])->middleware('institution.role:institution_admin,registrar');
+        Route::post('academic-programs', [AcademicProgramController::class, 'store'])->middleware('institution.role:institution_admin');
+        Route::get('academic-programs/{id}', [AcademicProgramController::class, 'show'])->middleware('institution.role:institution_admin,registrar');
+        Route::put('academic-programs/{id}', [AcademicProgramController::class, 'update'])->middleware('institution.role:institution_admin');
+        Route::delete('academic-programs/{id}', [AcademicProgramController::class, 'destroy'])->middleware('institution.role:institution_admin');
     });
 
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
-        Route::get('/academic-plans', [AcademicPlanController::class, 'index']);
-        Route::post('/academic-plans', [AcademicPlanController::class, 'store']);
-        Route::get('/academic-plans/{id}', [AcademicPlanController::class, 'show']);
-        Route::put('/academic-plans/{id}', [AcademicPlanController::class, 'update']);
-        Route::delete('/academic-plans/{id}', [AcademicPlanController::class, 'destroy']);
+        Route::get('/academic-plans', [AcademicPlanController::class, 'index'])->middleware('institution.role:institution_admin,registrar');
+        Route::post('/academic-plans', [AcademicPlanController::class, 'store'])->middleware('institution.role:institution_admin');
+        Route::get('/academic-plans/{id}', [AcademicPlanController::class, 'show'])->middleware('institution.role:institution_admin,registrar');
+        Route::put('/academic-plans/{id}', [AcademicPlanController::class, 'update'])->middleware('institution.role:institution_admin');
+        Route::delete('/academic-plans/{id}', [AcademicPlanController::class, 'destroy'])->middleware('institution.role:institution_admin');
     });
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
