@@ -54,7 +54,7 @@ class AcademicUnitTest extends TestCase
         }
 
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         return ['X-Institution-Id' => (string) $institution->id];

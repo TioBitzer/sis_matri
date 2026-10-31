@@ -30,7 +30,7 @@ class AcademicOfferingTest extends TestCase
         // contextos solo crean datos ajenos para verificar el aislamiento.
         if ($this->selectedOfferingInstitutionId === null) {
             $user = User::factory()->create();
-            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'institution_admin']);
             $this->actingAs($user);
             $this->withHeader('X-Institution-Id', (string) $institution->id);
             $this->selectedOfferingInstitutionId = (int) $institution->id;

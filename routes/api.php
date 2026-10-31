@@ -55,27 +55,27 @@ Route::middleware(['auth:sanctum', 'institution.access'])
     });
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
-        Route::get('/academic-levels', [AcademicLevelController::class, 'index']);
-        Route::post('/academic-levels', [AcademicLevelController::class, 'store']);
-        Route::get('/academic-levels/{id}', [AcademicLevelController::class, 'show']);
-        Route::put('/academic-levels/{id}', [AcademicLevelController::class, 'update']);
-        Route::delete('/academic-levels/{id}', [AcademicLevelController::class, 'destroy']);
+        Route::get('/academic-levels', [AcademicLevelController::class, 'index'])->middleware('institution.role:institution_admin,registrar');
+        Route::post('/academic-levels', [AcademicLevelController::class, 'store'])->middleware('institution.role:institution_admin');
+        Route::get('/academic-levels/{id}', [AcademicLevelController::class, 'show'])->middleware('institution.role:institution_admin,registrar');
+        Route::put('/academic-levels/{id}', [AcademicLevelController::class, 'update'])->middleware('institution.role:institution_admin');
+        Route::delete('/academic-levels/{id}', [AcademicLevelController::class, 'destroy'])->middleware('institution.role:institution_admin');
     });
-Route::get('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
-Route::post('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
-Route::put('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
-Route::delete('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-periods', [AcademicPeriodController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
-Route::post('/academic-periods', [AcademicPeriodController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-periods/{id}', [AcademicPeriodController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
-Route::put('/academic-periods/{id}', [AcademicPeriodController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
-Route::delete('/academic-periods/{id}', [AcademicPeriodController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-offerings', [AcademicOfferingController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
-Route::post('/academic-offerings', [AcademicOfferingController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-offerings/{id}', [AcademicOfferingController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
-Route::put('/academic-offerings/{id}', [AcademicOfferingController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
-Route::delete('/academic-offerings/{id}', [AcademicOfferingController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
+Route::get('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::post('/academic-curriculum-items', [AcademicCurriculumItemController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::put('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::delete('/academic-curriculum-items/{id}', [AcademicCurriculumItemController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-periods', [AcademicPeriodController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::post('/academic-periods', [AcademicPeriodController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-periods/{id}', [AcademicPeriodController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::put('/academic-periods/{id}', [AcademicPeriodController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::delete('/academic-periods/{id}', [AcademicPeriodController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-offerings', [AcademicOfferingController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::post('/academic-offerings', [AcademicOfferingController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-offerings/{id}', [AcademicOfferingController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::put('/academic-offerings/{id}', [AcademicOfferingController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::delete('/academic-offerings/{id}', [AcademicOfferingController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
 Route::get('/teaching-assignments', [TeachingAssignmentController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
 Route::post('/teaching-assignments', [TeachingAssignmentController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
 Route::get('/teaching-assignments/{id}', [TeachingAssignmentController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
@@ -96,11 +96,11 @@ Route::post('/enrollment-details', [EnrollmentDetailController::class, 'store'])
 Route::get('/enrollment-details/{id}', [EnrollmentDetailController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::put('/enrollment-details/{id}', [EnrollmentDetailController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::delete('/enrollment-details/{id}', [EnrollmentDetailController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
-Route::get('/academic-units', [AcademicUnitController::class, 'index'])->middleware(['auth:sanctum', 'institution.access']);
-Route::post('/academic-units', [AcademicUnitController::class, 'store'])->middleware(['auth:sanctum', 'institution.access']);
-Route::get('/academic-units/{id}', [AcademicUnitController::class, 'show'])->middleware(['auth:sanctum', 'institution.access']);
-Route::put('/academic-units/{id}', [AcademicUnitController::class, 'update'])->middleware(['auth:sanctum', 'institution.access']);
-Route::delete('/academic-units/{id}', [AcademicUnitController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access']);
+Route::get('/academic-units', [AcademicUnitController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::post('/academic-units', [AcademicUnitController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::get('/academic-units/{id}', [AcademicUnitController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+Route::put('/academic-units/{id}', [AcademicUnitController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+Route::delete('/academic-units/{id}', [AcademicUnitController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
 Route::middleware(['auth:sanctum', 'institution.access'])
     ->group(function () {
         Route::get('/campuses', [CampusController::class, 'index']);
