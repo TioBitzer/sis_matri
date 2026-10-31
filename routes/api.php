@@ -141,3 +141,12 @@ Route::middleware([
 
 // FASE 3C: solo lectura de auditoria institucional
 Route::get('/institution-membership-audits', [\App\Http\Controllers\Api\InstitutionMembershipAuditController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin']);
+
+// FASE 4A: CONSULTAS PERSONALES SEGURAS (solo lectura).
+Route::middleware(['auth:sanctum', 'institution.access'])->group(function () {
+    Route::get('/me/teacher', [\App\Http\Controllers\Api\MyAcademicController::class, 'teacher'])->middleware('institution.role:teacher');
+    Route::get('/me/teacher/assignments', [\App\Http\Controllers\Api\MyAcademicController::class, 'teachingAssignments'])->middleware('institution.role:teacher');
+    Route::get('/me/student', [\App\Http\Controllers\Api\MyAcademicController::class, 'student'])->middleware('institution.role:student');
+    Route::get('/me/student/enrollments', [\App\Http\Controllers\Api\MyAcademicController::class, 'enrollments'])->middleware('institution.role:student');
+    Route::get('/me/student/academic-records', [\App\Http\Controllers\Api\MyAcademicController::class, 'academicRecords'])->middleware('institution.role:student');
+});
