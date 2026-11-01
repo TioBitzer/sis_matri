@@ -24,6 +24,10 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+// FASE 5B: instituciones activas de la cuenta (sin X-Institution-Id).
+Route::get('/me/institutions', [\App\Http\Controllers\Api\MyInstitutionsController::class, 'index'])
+    ->middleware('auth:sanctum');
+
 Route::get('/test', function () {
     return response()->json([
         'message' => 'API funcionando correctamente'
