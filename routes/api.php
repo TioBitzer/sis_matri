@@ -92,6 +92,8 @@ Route::put('/academic-records/{id}', [AcademicRecordController::class, 'update']
 Route::delete('/academic-records/{id}', [AcademicRecordController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::get('/enrollments', [EnrollmentController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::post('/enrollments', [EnrollmentController::class, 'store'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
+// FASE6B_OFERTAS_ELEGIBLES_V1
+Route::get('/enrollments/{id}/available-offerings', [\App\Http\Controllers\Api\EligibleEnrollmentOfferingsController::class, 'index'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::get('/enrollments/{id}', [EnrollmentController::class, 'show'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::put('/enrollments/{id}', [EnrollmentController::class, 'update'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
 Route::delete('/enrollments/{id}', [EnrollmentController::class, 'destroy'])->middleware(['auth:sanctum', 'institution.access', 'institution.role:institution_admin,registrar']);
