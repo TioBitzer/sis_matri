@@ -327,8 +327,16 @@ class EnrollmentDetailController extends Controller
             return;
         }
 
-        $occupied = EnrollmentDetail::where('academic_offering_id', $offering->id)
-            ->where('status', 'active')->count();
+        // Bajo REPEATABLE READ, count() usa una lectura MVCC que puede
+        // estar desactualizada aunque ya tengamos lockForUpdate() de la oferta.
+        // Esta consulta SELECT ... FOR UPDATE lee el estado confirmado actual.
+        // Se ejecuta DESPUES de bloquear la oferta y dentro de la transaccion.
+        $occupied = EnrollmentDetail::query()
+            ->where('academic_offering_id', $offering->id)
+            ->where('status', 'active')
+            ->lockForUpdate()
+            ->get(['id'])
+            ->count();
 
         if ($occupied >= (int) $offering->capacity) {
             $this->invalid('academic_offering_id', 'No hay vacantes disponibles en esta sección.');
