@@ -8,6 +8,7 @@ use App\Models\AcademicRecord;
 use App\Models\Enrollment;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -63,32 +64,47 @@ class EnrollmentController extends Controller
 
     public function update(Request $request, $id)
     {
-        $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
-            ->findOrFail($id);
-        $validated = $request->validate($this->rules());
-        $this->validateTenantReferences($validated, $this->selectedInstitutionId($request));
+        // FASE6A_CANCELACION_ATOMICA_V1: bloquear la matrícula mientras
+        // se actualizan sus cursos evita una cancelación parcial.
+        return DB::transaction(function () use ($request, $id) {
+            $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
+                ->lockForUpdate()
+                ->findOrFail($id);
 
-        // No se deben mover cursos inscritos a otro estudiante, expediente o período.
-        if ($enrollment->enrollmentDetails()->exists() && (
-            (int) $enrollment->student_id !== (int) $validated['student_id'] ||
-            (int) $enrollment->academic_period_id !== (int) $validated['academic_period_id'] ||
-            (int) $enrollment->academic_record_id !== (int) $validated['academic_record_id']
-        )) {
+            $validated = $request->validate($this->rules());
+            $this->validateTenantReferences($validated, $this->selectedInstitutionId($request));
+
+            // No cambiar estudiante, periodo ni expediente con cursos existentes.
+            if ($enrollment->enrollmentDetails()->exists() && (
+                (int) $enrollment->student_id !== (int) $validated['student_id'] ||
+                (int) $enrollment->academic_period_id !== (int) $validated['academic_period_id'] ||
+                (int) $enrollment->academic_record_id !== (int) $validated['academic_record_id']
+            )) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se puede cambiar el estudiante, período o historial académico de una matrícula con cursos registrados.',
+                ], 409);
+            }
+
+            $this->validateCoherence($validated, $enrollment);
+
+            // Cancelar también los cursos activos en la misma transacción.
+            // Los detalles históricos (completed, cancelled) no se eliminan ni se alteran.
+            // Con status=cancelled dejan de ocupar las vacantes de la sección.
+            if ($validated['status'] === 'cancelled') {
+                $enrollment->enrollmentDetails()
+                    ->where('status', 'active')
+                    ->update(['status' => 'cancelled']);
+            }
+
+            $enrollment->update($validated);
+
             return response()->json([
-                'success' => false,
-                'message' => 'No se puede cambiar el estudiante, período o historial académico de una matrícula con cursos registrados.',
-            ], 409);
-        }
-
-        $this->validateCoherence($validated, $enrollment);
-        $enrollment->update($validated);
-
-        return response()->json([
-            'success' => true,
-            'data' => $enrollment->fresh()->load(self::RELATIONS),
-        ]);
+                'success' => true,
+                'data' => $enrollment->fresh()->load(self::RELATIONS),
+            ]);
+        }, 3);
     }
-
     public function destroy(Request $request, $id)
     {
         $enrollment = $this->tenantQuery($this->selectedInstitutionId($request))
