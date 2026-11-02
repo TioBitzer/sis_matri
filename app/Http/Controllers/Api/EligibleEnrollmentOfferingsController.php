@@ -47,6 +47,14 @@ class EligibleEnrollmentOfferingsController extends Controller
             ], 409);
         }
 
+        // FASE6E_PERIODO_ACTIVO_OFFERS_V1: no presentar vacantes inscribibles en períodos cerrados.
+        $enrollment->loadMissing('academicPeriod');
+        if (!$enrollment->academicPeriod?->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El período académico está inactivo; no se permiten nuevas inscripciones.',
+            ], 409);
+        }
         $alreadyRegisteredUnits = DB::table('enrollment_details')
             ->join('academic_offerings', 'academic_offerings.id', '=', 'enrollment_details.academic_offering_id')
             ->where('enrollment_details.enrollment_id', $enrollment->id)

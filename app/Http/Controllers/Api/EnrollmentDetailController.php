@@ -52,6 +52,10 @@ class EnrollmentDetailController extends Controller
                 $this->invalid('academic_offering_id', 'No se pueden registrar cursos en una oferta académica inactiva.');
             }
 
+            // FASE6E_PERIODO_ACTIVO_DETAIL_V1: sin inscripciones activas en períodos cerrados.
+            if ($data['status'] === 'active' && !$enrollment->academicPeriod?->is_active) {
+                $this->invalid('academic_period_id', 'No se puede inscribir en un período académico inactivo.');
+            }
             $this->validateVacancy($enrollment, $offering, $data['status'], true);
 
             $detail = EnrollmentDetail::create($data);
@@ -132,6 +136,10 @@ class EnrollmentDetailController extends Controller
                 $this->invalid('academic_offering_id', 'No se puede trasladar una inscripción a una oferta inactiva.');
             }
 
+            // FASE6E: también bloquear reactivaciones y traslados que consuman una vacante.
+            if ($needsVacancy && !$enrollment->academicPeriod?->is_active) {
+                $this->invalid('academic_period_id', 'No se puede reactivar un curso en un período académico inactivo.');
+            }
             $this->validateVacancy($enrollment, $offering, $data['status'], $needsVacancy);
 
             $detail->update($data);

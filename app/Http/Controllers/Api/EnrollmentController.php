@@ -40,6 +40,13 @@ class EnrollmentController extends Controller
     {
         $validated = $request->validate($this->rules());
         $this->validateTenantReferences($validated, $this->selectedInstitutionId($request));
+        // FASE6E_PERIODO_ACTIVO_ENROLLMENT_V1: impedir nuevas matrículas activas en períodos cerrados.
+        if ($validated['status'] === 'active' && !AcademicPeriod::query()
+            ->whereKey($validated['academic_period_id'])->where('is_active', true)->exists()) {
+            throw ValidationException::withMessages([
+                'academic_period_id' => 'No se puede activar una matrícula en un período académico inactivo.',
+            ]);
+        }
         $this->validateCoherence($validated);
 
         $enrollment = Enrollment::create($validated);
@@ -86,6 +93,14 @@ class EnrollmentController extends Controller
                 ], 409);
             }
 
+            // FASE6E: impedir reactivar una matrícula cuando el período está inactivo;
+            // cancelar y completar matrículas históricas sigue permitido.
+            if ($validated['status'] === 'active' && !AcademicPeriod::query()
+                ->whereKey($validated['academic_period_id'])->where('is_active', true)->exists()) {
+                throw ValidationException::withMessages([
+                    'academic_period_id' => 'No se puede activar una matrícula en un período académico inactivo.',
+                ]);
+            }
             $this->validateCoherence($validated, $enrollment);
 
             // Cancelar también los cursos activos en la misma transacción.
