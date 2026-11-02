@@ -66,7 +66,7 @@ class AcademicCurriculumItemTenantIsolationTest extends TestCase
     private function userIn(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -324,7 +324,7 @@ class AcademicCurriculumItemTenantIsolationTest extends TestCase
         $itemA = $this->item($a);
         $itemB = $this->item($b);
         $user = $this->userIn($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($a['institution']))

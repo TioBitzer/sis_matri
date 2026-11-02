@@ -39,7 +39,7 @@ class AcademicPeriodTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -231,7 +231,7 @@ class AcademicPeriodTenantIsolationTest extends TestCase
         $periodB = $this->period($institutionB);
 
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($institutionA))
@@ -253,7 +253,7 @@ class AcademicPeriodTenantIsolationTest extends TestCase
         $institutionA = $this->institution('PER-A');
         $institutionB = $this->institution('PER-B');
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($institutionA, 'Semestre I'), $this->headers($institutionA))
@@ -269,7 +269,7 @@ class AcademicPeriodTenantIsolationTest extends TestCase
         $institutionA = $this->institution('PER-A');
         $institutionB = $this->institution('PER-B');
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($institutionB), $this->headers($institutionA))

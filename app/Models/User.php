@@ -51,6 +51,7 @@ class User extends Authenticatable
                 'id',
                 'person_id',
                 'is_active',
+                'role',
             ])
             ->withTimestamps();
     }

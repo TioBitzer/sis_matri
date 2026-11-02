@@ -47,7 +47,7 @@ class AcademicPlanTenantIsolationTest extends TestCase
     private function userWithMembership(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -245,7 +245,7 @@ class AcademicPlanTenantIsolationTest extends TestCase
         $planB = $this->makePlan($this->makeProgram($institutionB, 'Programa B'));
 
         $user = $this->userWithMembership($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson('/api/academic-plans', $this->headers($institutionA))

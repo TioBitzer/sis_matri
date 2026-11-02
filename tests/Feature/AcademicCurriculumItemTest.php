@@ -41,7 +41,7 @@ class AcademicCurriculumItemTest extends TestCase
 
         if ($this->institucionTenantId !== $institution->id) {
             $this->usuarioTenant->institutions()->syncWithoutDetaching([
-                $institution->id => ['is_active' => true],
+                $institution->id => ['is_active' => true, 'role' => 'institution_admin'],
             ]);
             $this->institucionTenantId = $institution->id;
         }

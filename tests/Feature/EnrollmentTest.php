@@ -31,7 +31,7 @@ class EnrollmentTest extends TestCase
 
         if (!$this->tenantIsSelected) {
             $user = User::factory()->create();
-            $user->institutions()->attach($institution->id, ['is_active' => true]);
+            $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'registrar']);
             $this->actingAs($user);
             $this->withHeaders(['X-Institution-Id' => (string) $institution->id]);
             $this->tenantIsSelected = true;
@@ -684,6 +684,52 @@ class EnrollmentTest extends TestCase
         $this->assertDatabaseHas('enrollment_details', ['id' => $detailId]);
     }
 
+    // FASE6A_CANCELACION_ATOMICA_V1
+    public function test_cancelar_matricula_cancela_cursos_activos_y_libera_vacantes(): void
+    {
+        $context = $this->context();
+        $enrollment = $this->enrollment($context);
+        $detailId = $this->makeDetail($context, $enrollment);
+        $offeringId = DB::table('enrollment_details')->where('id', $detailId)
+            ->value('academic_offering_id');
+
+        $this->assertDatabaseHas('enrollment_details', [
+            'id' => $detailId, 'status' => 'active',
+        ]);
+
+        $this->putJson(self::ENDPOINT . "/{$enrollment->id}", $this->payload($context, [
+            'status' => 'cancelled',
+        ]))->assertOk()->assertJsonPath('data.status', 'cancelled');
+
+        $this->assertDatabaseHas('enrollments', [
+            'id' => $enrollment->id, 'status' => 'cancelled',
+        ]);
+        $this->assertDatabaseHas('enrollment_details', [
+            'id' => $detailId, 'enrollment_id' => $enrollment->id,
+            'academic_offering_id' => $offeringId, 'status' => 'cancelled',
+        ]);
+        $this->assertSame(0, DB::table('enrollment_details')
+            ->where('academic_offering_id', $offeringId)
+            ->where('status', 'active')->count());
+    }
+
+    public function test_cancelar_matricula_conserva_detalles_historicos_completados(): void
+    {
+        $context = $this->context();
+        $enrollment = $this->enrollment($context);
+        $detailId = $this->makeDetail($context, $enrollment);
+        DB::table('enrollment_details')->where('id', $detailId)
+            ->update(['status' => 'completed']);
+
+        $this->putJson(self::ENDPOINT . "/{$enrollment->id}", $this->payload($context, [
+            'status' => 'cancelled',
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('enrollment_details', [
+            'id' => $detailId, 'enrollment_id' => $enrollment->id,
+            'status' => 'completed',
+        ]);
+    }
     public function test_eliminar_una_matricula_no_elimina_otra(): void
     {
         $c = $this->context();

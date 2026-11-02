@@ -54,7 +54,7 @@ class AcademicOfferingTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -299,7 +299,7 @@ class AcademicOfferingTenantIsolationTest extends TestCase
         $offeringA = $this->offering($a);
         $offeringB = $this->offering($b);
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
         $this->getJson(self::ENDPOINT, $this->headers($a['institution']))
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $offeringA->id);
@@ -314,7 +314,7 @@ class AcademicOfferingTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
         $this->postJson(self::ENDPOINT, $this->payload($b), $this->headers($a['institution']))
             ->assertUnprocessable()->assertJsonValidationErrors('academic_unit_id');
@@ -326,7 +326,7 @@ class AcademicOfferingTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
         $this->postJson(self::ENDPOINT, $this->payload($a), $this->headers($a['institution']))->assertCreated();
         $this->postJson(self::ENDPOINT, $this->payload($b), $this->headers($b['institution']))->assertCreated();

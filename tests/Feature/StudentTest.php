@@ -22,7 +22,7 @@ class StudentTest extends TestCase
     {
         $institution = Institution::create($data);
         $user = \App\Models\User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => true]);
+        $user->institutions()->attach($institution->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
         $this->withHeader('X-Institution-Id', (string) $institution->id);
         return $institution;

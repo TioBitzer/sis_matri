@@ -64,7 +64,7 @@ class AcademicRecordTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'registrar']);
         return $user;
     }
 
@@ -313,7 +313,7 @@ class AcademicRecordTenantIsolationTest extends TestCase
         $recordA = $this->record($a);
         $recordB = $this->record($b);
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($a['institution']))
@@ -329,7 +329,7 @@ class AcademicRecordTenantIsolationTest extends TestCase
         $a = $this->context('A');
         $b = $this->context('B');
         $user = $this->member($a['institution']);
-        $user->institutions()->attach($b['institution']->id, ['is_active' => true]);
+        $user->institutions()->attach($b['institution']->id, ['is_active' => true, 'role' => 'registrar']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($b), $this->headers($a['institution']))

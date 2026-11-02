@@ -40,7 +40,7 @@ class AcademicUnitTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -225,7 +225,7 @@ class AcademicUnitTenantIsolationTest extends TestCase
         $unitB = $this->unit($institutionB);
 
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($institutionA))
@@ -247,7 +247,7 @@ class AcademicUnitTenantIsolationTest extends TestCase
         $institutionA = $this->institution('UNIT-A');
         $institutionB = $this->institution('UNIT-B');
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($institutionA, 'Matematicas I'), $this->headers($institutionA))
@@ -264,7 +264,7 @@ class AcademicUnitTenantIsolationTest extends TestCase
         $institutionA = $this->institution('UNIT-A');
         $institutionB = $this->institution('UNIT-B');
         $user = $this->member($institutionA);
-        $user->institutions()->attach($institutionB->id, ['is_active' => true]);
+        $user->institutions()->attach($institutionB->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->postJson(self::ENDPOINT, $this->payload($institutionB), $this->headers($institutionA))

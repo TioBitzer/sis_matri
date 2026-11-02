@@ -59,7 +59,7 @@ class AcademicLevelTenantIsolationTest extends TestCase
     private function member(Institution $institution, bool $active = true): User
     {
         $user = User::factory()->create();
-        $user->institutions()->attach($institution->id, ['is_active' => $active]);
+        $user->institutions()->attach($institution->id, ['is_active' => $active, 'role' => 'institution_admin']);
 
         return $user;
     }
@@ -244,7 +244,7 @@ class AcademicLevelTenantIsolationTest extends TestCase
         $levelB = $this->level($this->plan($this->program($b)));
 
         $user = $this->member($a);
-        $user->institutions()->attach($b->id, ['is_active' => true]);
+        $user->institutions()->attach($b->id, ['is_active' => true, 'role' => 'institution_admin']);
         $this->actingAs($user);
 
         $this->getJson(self::ENDPOINT, $this->headers($a))
