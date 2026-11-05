@@ -1,59 +1,71 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema de Gestión de Matrículas — Multiinstitución
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Proyecto colaborativo para gestionar instituciones educativas, sedes, programas, planes, cursos, docentes, estudiantes y matrículas, con permisos y aislamiento por institución. Está en desarrollo; **no se considera listo para producción**.
 
-## About Laravel
+**Equipo:** Bruno (coordinación y backend), Junior (autenticación React) y Cristian (interfaz de matrículas React).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Estado y contexto para colaboradores
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **[Estado del proyecto, avances, tareas y cómo retomar la fase 6G](docs/ESTADO_PROYECTO.md)** — punto de partida para el equipo y otros asistentes.
+- **[Contrato React ↔ API de matrículas](docs/API_REACT_MATRICULAS.md)** — endpoints, respuesta JSON, roles y errores esperados.
+- **[Modelo del dominio](docs/domain.md)** — entidades académicas y relaciones del sistema.
+- **[Pull Request #20 fusionado](https://github.com/TioBitzer/sis_matri/pull/20)** — última gran integración confirmada en `main` antes de la fase 6G.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Tecnología
 
-## Learning Laravel
+- Backend: PHP 8.2+ / Laravel 12 / Laravel Sanctum / Eloquent / API REST.
+- Frontend: React 19 / Vite / Axios (`frontend/`).
+- Base de datos: relacional; pruebas PHPUnit configuradas con SQLite en memoria.
+- Colaboración: Git, ramas por funcionalidad, Pull Requests y GitHub Actions.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### Lo que ya existe
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Backend con instituciones, administración de membresías y roles, catálogo académico, personas/docentes/estudiantes, historiales, matrículas, detalles, ofertas elegibles, permisos por institución y controles de estado/cupo.
 
-## Laravel Sponsors
+Las páginas React de varios CRUD existen. La integración completa de sesión Sanctum, selección de institución y validación de flujos reales en navegador **todavía está pendiente**.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+La última ejecución de pruebas **informada por el equipo** antes de la fase 6G fue **1,073 pruebas / 4,360 aserciones** (2 de noviembre de 2026). Para el resultado actual, consultar los *Checks* del Pull Request y ejecutar la suite.
 
-### Premium Partners
+## Desarrollo local
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+# Backend: desde la raíz
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve --host=localhost --port=8000
+```
 
-## Contributing
+Usar una base de desarrollo. Si ya existe `.env`, conservarlo y revisar las variables de sesión/SPA que aparecen en `.env.example`. **No versionar `.env`**.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+# Frontend: en otra terminal
+cd frontend
+npm ci
+npm run dev -- --host localhost
+```
 
-## Code of Conduct
+Para las pruebas de backend:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan test
+```
 
-## Security Vulnerabilities
+Para compilar el frontend:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+cd frontend
+npm run build
+```
 
-## License
+Las pruebas se ejecutan usando el entorno PHPUnit (SQLite en memoria definido en `phpunit.xml`). Confirmar la configuración de pruebas antes de ejecutarlas y nunca usar una base con información real.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Trabajo en equipo
+
+1. Actualizar `main` y crear una rama propia desde allí.
+2. Evitar modificar simultáneamente archivos de otro integrante sin coordinarlo.
+3. Crear Pull Request hacia `main` y verificar los trabajos automáticos de Laravel y React.
+4. Documentar decisiones de API en `docs/API_REACT_MATRICULAS.md` y actualizar `docs/ESTADO_PROYECTO.md` al completar una fase.
+
+**Para quien retoma el trabajo desde otro ChatGPT:** leer primero [docs/ESTADO_PROYECTO.md](docs/ESTADO_PROYECTO.md) en la rama o PR activo, no solo en `main`. Revisar los commits y pruebas reales antes de dar por completada una tarea.
