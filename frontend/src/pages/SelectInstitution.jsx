@@ -35,19 +35,16 @@ function SelectInstitution() {
     }
   }, [])
 
-  const seleccionar = (institution) => {
-    // Guardamos temporalmente el ID de la institución.
-    sessionStorage.setItem(
-      'sis_matri_institution_id',
-      String(institution.id)
-    )
 
-    // Permite enviar la institución en las peticiones actuales.
-    api.defaults.headers.common['X-Institution-Id'] =
-      String(institution.id)
+const seleccionar = (institution) => {
+  sessionStorage.setItem(
+    'sis_matri_institution_id',
+    String(institution.id)
+  )
 
-    navigate('/', { replace: true })
-  }
+  navigate('/', { replace: true })
+}
+
 
   return (
     <main>
