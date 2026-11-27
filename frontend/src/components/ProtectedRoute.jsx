@@ -37,6 +37,18 @@ function ProtectedRoute() {
     )
   }
 
+  // Exigir que se seleccione una institución
+  const institutionId = sessionStorage.getItem(
+    'sis_matri_institution_id'
+  )
+
+  if (
+    !institutionId &&
+    location.pathname !== '/select-institution'
+  ) {
+    return <Navigate to="/select-institution" replace />
+  }
+
   return <Outlet />
 }
 
