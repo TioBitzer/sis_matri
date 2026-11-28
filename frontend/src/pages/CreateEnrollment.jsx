@@ -310,9 +310,9 @@ function CreateEnrollment() {
             aria-invalid={Boolean(errores.status)}
           >
             <option value="">Selecciona un estado</option>
-            <option value="Activo">Activo</option>
-            <option value="Finalizado">Finalizado</option>
-            <option value="Cancelado">Cancelado</option>
+            <option value="active">Activo</option>
+            <option value="completed">Finalizado</option>
+            <option value="cancelled">Cancelado</option>
           </select>
 
           {errores.status && (
