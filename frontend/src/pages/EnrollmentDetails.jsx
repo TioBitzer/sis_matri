@@ -16,6 +16,11 @@ function EnrollmentDetails() {
 
   const location = useLocation()
   const navigate = useNavigate()
+  const [ultimaNavegacion, setUltimaNavegacion] = useState(null)
+
+  if (location.state?.mensaje && ultimaNavegacion !== location.key) {
+    setUltimaNavegacion(location.key)
+  }
 
   useEffect(() => {
     let activo = true
@@ -60,7 +65,6 @@ function EnrollmentDetails() {
 
   useEffect(() => {
     if (location.state?.mensaje) {
-      setMensaje(location.state.mensaje)
 
       navigate(location.pathname, {
         replace: true,

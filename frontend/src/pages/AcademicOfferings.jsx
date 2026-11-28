@@ -10,30 +10,30 @@ function AcademicOfferings() {
   const [mensaje, setMensaje] = useState('')
   const [error, setError] = useState('')
 
-  const cargarOfertas = async () => {
-    try {
-      setError('')
-
-      const response = await api.get('/academic-offerings')
-
-      setOfertas(response.data.data ?? [])
-    } catch (error) {
-      console.error(
-        'Error al cargar ofertas académicas:',
-        error
-      )
-
-      setError(
-        error.response?.data?.message ||
-        'No se pudieron cargar las ofertas académicas.'
-      )
-    } finally {
-      setCargando(false)
-    }
-  }
-
   useEffect(() => {
-    cargarOfertas()
+    let activo = true
+
+    api.get("/academic-offerings")
+      .then(response => {
+        if (activo) {
+          setOfertas(response.data.data ?? [])
+        }
+      })
+      .catch(error => {
+        if (activo) {
+          setError(
+            error.response?.data?.message ||
+            "No se pudieron cargar las ofertas academicas."
+          )
+        }
+      })
+      .finally(() => {
+        if (activo) setCargando(false)
+      })
+
+    return () => {
+      activo = false
+    }
   }, [])
 
   const handleDelete = async (id) => {
