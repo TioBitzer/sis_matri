@@ -21,7 +21,8 @@ use App\Http\Controllers\Api\TeacherController;
 
 
 Route::get('/user', function (Request $request) {
-    return $request->user();
+    // Contrato SPA estable: no exponer atributos internos del modelo User.
+    return response()->json($request->user()->only(['id', 'name', 'email']));
 })->middleware('auth:sanctum');
 
 // FASE 5B: instituciones activas de la cuenta (sin X-Institution-Id).

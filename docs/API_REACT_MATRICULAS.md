@@ -4,13 +4,15 @@
 **Objetivo:** que Cristian pueda consumir la API existente sin inventar nombres de campos ni esquemas de error.  
 **Alcance:** autenticación y selección de institución, matrículas, detalles y ofertas elegibles. **No se modifican endpoints** con esta fase.
 
+**Actualización de fase 6G (5 de noviembre de 2026):** la ruta `/api/user` ahora expone únicamente tres campos públicos. Consultar [ESTADO_PROYECTO.md](ESTADO_PROYECTO.md) para el estado de integración del equipo y los Checks del Pull Request.
+
 ## 1. Autenticación y sesión (Sanctum SPA)
 
 La aplicación React de primera parte debe usar cookies de sesión. No guardar tokens ni contraseñas en `localStorage`.
 
 1. `GET /sanctum/csrf-cookie` con credenciales; Axios debe admitir cookies y cabeceras XSRF.
 2. `POST /login` con `email` y `password`; devuelve `200` y un objeto `user` con `id`, `name` y `email`.
-3. `GET /api/user` para verificar la sesión; **su respuesta es el modelo de usuario serializado, no** `{data: {...}}`.
+3. `GET /api/user` para verificar la sesión; devuelve **solo** `id`, `name` y `email` como objeto JSON directo, **sin** `{data: {...}}` (contrato ajustado en la fase 6G).
 4. `GET /api/me/institutions` con sesión; devuelve solo las instituciones y membresías activas del usuario.
 5. Seleccionar un `id` de esa lista y mandar `X-Institution-Id` en las peticiones siguientes.
 6. `POST /logout` para invalidar la sesión. Limpiar el estado de institución del frontend.
@@ -183,7 +185,7 @@ Este ejemplo asume que React y Laravel comparten el mismo sitio principal, con c
 - `GET /api/enrollments` y `GET /api/enrollment-details` usan `get()` sin paginación; conviene planificar una versión paginada **con compatibilidad controlada**, no cambiar la forma de respuesta silenciosamente.
 - Las respuestas de error no están normalizadas entre middleware, validación y conflictos; conviene decidir un formato único antes de declarar API v1 estable.
 - Existe `GET /api/test` público. Revisar su necesidad y retirarlo antes de producción si es una ruta de diagnóstico temporal.
-- La respuesta de `GET /api/user` serializa el modelo completo según sus atributos visibles; revisar exposición de datos antes de producción.
+- La respuesta de `GET /api/user` está limitada a `id`, `name` y `email`; mantener la prueba `ReactUserSessionContractTest` para impedir futuras filtraciones de atributos internos.
 - Falta comprobar en navegador real cookies, CSRF, CORS, expiración de sesión y revocación al cambiar de institución.
 - El endpoint de vacantes muestra un **estado instantáneo**, no una reserva. La protección final debe seguir en el backend.
 

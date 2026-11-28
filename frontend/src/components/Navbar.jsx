@@ -1,6 +1,7 @@
 
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import api, { authApi } from '../services/api'
 
 const grupos = [
   {
@@ -41,10 +42,33 @@ const grupos = [
 ]
 
 function Navbar() {
-  const [menuAbierto, setMenuAbierto] = useState(null)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  const [menuAbierto, setMenuAbierto] = useState(null)
+  const [cerrandoSesion, setCerrandoSesion] = useState(false)
 
   const cerrarMenu = () => setMenuAbierto(null)
+
+  const cerrarSesion = async () => {
+    if (cerrandoSesion) return
+
+    setCerrandoSesion(true)
+
+    try {
+      await authApi.post('/logout')
+
+      sessionStorage.removeItem('sis_matri_institution_id')
+      delete api.defaults.headers.common['X-Institution-Id']
+
+      navigate('/login', { replace: true })
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+      window.alert('No se pudo cerrar sesión. Intenta nuevamente.')
+    } finally {
+      setCerrandoSesion(false)
+    }
+  }
 
   const enlaceActivo = (ruta) => {
     if (ruta === '/') {
@@ -55,6 +79,13 @@ function Navbar() {
       location.pathname === ruta ||
       location.pathname.startsWith(`${ruta}/`)
     )
+  }
+
+  if (
+    location.pathname === '/login' ||
+    location.pathname === '/select-institution'
+  ) {
+    return null
   }
 
   return (
@@ -100,9 +131,7 @@ function Navbar() {
                   <Link
                     key={enlace.ruta}
                     to={enlace.ruta}
-                    className={
-                      enlaceActivo(enlace.ruta) ? 'activo' : ''
-                    }
+                    className={enlaceActivo(enlace.ruta) ? 'activo' : ''}
                     onClick={cerrarMenu}
                   >
                     {enlace.nombre}
@@ -112,6 +141,15 @@ function Navbar() {
             )}
           </div>
         ))}
+
+        <button
+          type="button"
+          className="navbar-dropdown-button"
+          onClick={cerrarSesion}
+          disabled={cerrandoSesion}
+        >
+          {cerrandoSesion ? 'Cerrando sesión...' : 'Cerrar sesión'}
+        </button>
       </div>
     </nav>
   )

@@ -14,6 +14,8 @@ function CreateEnrollmentDetail() {
 
   const [matriculas, setMatriculas] = useState([])
   const [ofertas, setOfertas] = useState([])
+  const [cargandoOfertas, setCargandoOfertas] = useState(false)
+  const [errorOfertas, setErrorOfertas] = useState("")
   const [errores, setErrores] = useState({})
   const [errorCarga, setErrorCarga] = useState('')
   const [cargando, setCargando] = useState(true)
@@ -25,11 +27,7 @@ function CreateEnrollmentDetail() {
 
     const cargarDatos = async () => {
       try {
-        const [respuestaMatriculas, respuestaOfertas] =
-          await Promise.all([
-            api.get('/enrollments'),
-            api.get('/academic-offerings'),
-          ])
+        const respuestaMatriculas = await api.get("/enrollments")
 
         if (activo) {
           setMatriculas(
@@ -38,11 +36,7 @@ function CreateEnrollmentDetail() {
               : []
           )
 
-          setOfertas(
-            Array.isArray(respuestaOfertas.data?.data)
-              ? respuestaOfertas.data.data
-              : []
-          )
+
         }
       } catch (error) {
         console.error(
@@ -69,13 +63,59 @@ function CreateEnrollmentDetail() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!formulario.enrollment_id) return
+
+    let activo = true
+
+    async function cargar() {
+      try {
+        const resultado = []
+        let pagina = 1
+        let ultima = 1
+
+        do {
+          const { data } = await api.get(
+            "/enrollments/" + formulario.enrollment_id + "/available-offerings",
+            { params: { per_page: 50, page: pagina } }
+          )
+
+          if (!activo) return
+          resultado.push(...(data.data ?? []))
+          ultima = data.meta?.last_page ?? 1
+          pagina++
+        } while (pagina <= ultima)
+
+        if (activo) {
+          setOfertas(resultado.filter(o => o.can_enroll))
+        }
+      } catch (error) {
+        if (activo) {
+          setErrorOfertas(error.response?.data?.message || "Error al consultar ofertas.")
+        }
+      } finally {
+        if (activo) setCargandoOfertas(false)
+      }
+    }
+
+    cargar()
+    return () => { activo = false }
+  }, [formulario.enrollment_id])
+
   const handleChange = (event) => {
     const { name, value } = event.target
 
     setFormulario((actual) => ({
       ...actual,
       [name]: value,
+      ...(name === "enrollment_id" ? { academic_offering_id: "" } : {}),
     }))
+
+    if (name === "enrollment_id") {
+      setOfertas([])
+      setErrorOfertas("")
+      setCargandoOfertas(Boolean(value))
+    }
 
     setErrores((actual) => ({
       ...actual,
@@ -263,9 +303,7 @@ function CreateEnrollmentDetail() {
                 oferta.academic_unit ??
                 oferta.academicUnit
 
-              const periodo =
-                oferta.academic_period ??
-                oferta.academicPeriod
+
 
               const campus = oferta.campus
 
@@ -278,12 +316,18 @@ function CreateEnrollmentDetail() {
                   {' - '}
                   {oferta.section || 'Sin sección'}
                   {' - '}
-                  {periodo?.name || 'Sin período'}
+                  {oferta.remaining === null ? "Sin limite" : oferta.remaining + " vacantes"}
                   {campus?.name ? ` - ${campus.name}` : ''}
                 </option>
               )
             })}
           </select>
+
+          {cargandoOfertas && <p>Consultando vacantes...</p>}
+          {errorOfertas && <p role="alert">{errorOfertas}</p>}
+          {formulario.enrollment_id && !cargandoOfertas && !errorOfertas && ofertas.length === 0 && (
+            <p>No hay cursos disponibles.</p>
+          )}
 
           {errores.academic_offering_id && (
             <p role="alert">
@@ -322,7 +366,7 @@ function CreateEnrollmentDetail() {
 
         <button
           type="submit"
-          disabled={guardando || !!errorCarga}
+          disabled={guardando || !!errorCarga || cargandoOfertas || !!errorOfertas || !formulario.academic_offering_id}
         >
           {guardando ? 'Guardando...' : 'Crear detalle'}
         </button>

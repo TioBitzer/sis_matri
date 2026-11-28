@@ -12,12 +12,16 @@ function AcademicRecords() {
 
   const location = useLocation()
   const navigate = useNavigate()
+  const [ultimaNavegacion, setUltimaNavegacion] = useState(null)
+
+  if (location.state?.mensaje && ultimaNavegacion !== location.key) {
+    setUltimaNavegacion(location.key)
+  }
 
   useEffect(() => {
     const mensajeNavegacion = location.state?.mensaje
 
     if (mensajeNavegacion) {
-      setMensaje(mensajeNavegacion)
 
       navigate(location.pathname, {
         replace: true,
