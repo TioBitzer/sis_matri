@@ -10,8 +10,20 @@ function ProtectedRoute() {
   useEffect(() => {
     let activo = true
 
-    api.get('/user')
-      .then(() => {
+    Promise.all([
+      api.get("/user"),
+      api.get("/me/institutions")
+    ])
+      .then(([, response]) => {
+        if (!activo) return
+
+        const selected = sessionStorage.getItem("sis_matri_institution_id")
+        const institutions = response.data.data ?? []
+
+        if (selected && !institutions.some(i => String(i.id) === selected)) {
+          sessionStorage.removeItem("sis_matri_institution_id")
+        }
+
         if (activo) setEstado('autenticado')
       })
       .catch(() => {

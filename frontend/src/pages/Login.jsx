@@ -27,7 +27,8 @@ function Login() {
       })
 
       // La ruta de selección se configurará después
-      navigate('/select-institution', { replace: true })
+      sessionStorage.removeItem("sis_matri_institution_id")
+      navigate("/select-institution", { replace: true })
     } catch (err) {
       setError(
         err.response?.data?.message ||
